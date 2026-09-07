@@ -366,7 +366,8 @@ local ButtonNames = {
     [27] = "Avarice prop",
     [28] = "Eryx (key:ErYxOnToP",
     [29] = "TXR prop",
-    [30] = "Join Discord"
+    [30] = "mahoraga",
+    [31] = "Join Discord"
 }
 
 --==================================================
@@ -585,8 +586,10 @@ local function Button26() loadstring(game:HttpGet("https://rawscripts.net/raw/Br
 local function Button27() loadstring(game:HttpGet("https://rawscripts.net/raw/Brookhaven-RP-AVARICE-WINGS-BY-NIZAM-217994"))() end
 local function Button28() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-ErYx-Prop-Animations-by-vansh-238691"))() end
 local function Button29() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-TXR-ASHU-ROBOT-POWERFULL-TROLL-SCRIPT-241380"))() end
-
 local function Button30()
+loadstring(game:HttpGet("https://pastefy.app/x5Rs6lef/raw/raw"))() end
+
+local function Button31()
     local link = "https://discord.gg/jFJQj22gjt"
     if setclipboard then
         setclipboard(link)
