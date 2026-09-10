@@ -1,0 +1,509 @@
+--deobfuscated by @Watup-Exploitz | discord.gg/EgbzrBqur2
+
+--[[
+ AVARICE TRIDENT - DUAL LAVA & WATER EDITION (CINEMATIC KINETIC OPTIMIZED V4.2) Engine Core: DYTON_txt (Engine Reset),Riff (Red Theme Fix), Abyss Mod Optimization & Math Core: Josep Bart (Cinematic Kinetic Smoothing & Interleaved Network
+]]
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local RS = game:GetService("RunService")
+local TS = game:GetService("TweenService")
+
+local OwnerName = LP.Name
+local petMode, isAttacking, skill2Active, soulSlashActive, deathSpinActive = false, false, false, false, false
+local isMinimized = false
+local comboStep = 1
+local wingRemoteCache, currentCFrames = {}, {}
+local lastNetworkUpdate, lastColorUpdate = 0, 0
+local colorIndex = 1
+
+local currentIdleSpin = 0
+local currentHollowSpin = 0
+
+local FLOAT_HEIGHT_OFFSET = -1   
+local FLOAT_AMPLITUDE = 0.45      
+local FLOAT_SPEED = 2.2           
+local IDLE_SPIN_SPEED = 0        
+
+local HOLLOW_SPEED = 2            
+local HOLLOW_OFFSET = Vector3.new(0, 0, 0) 
+local HOLLOW_ROT_X = 0            
+local HOLLOW_ROT_Y = 180            
+local HOLLOW_ROT_Z = 0             
+local HOLLOW_SPIN_SPEED = 50        
+
+local currentTheme = "Water"
+
+local THEMES = {
+    Water = {
+        Color1 = Color3.fromRGB(10, 15, 30),  
+        Color2 = Color3.fromRGB(20, 60, 160), 
+        Color3 = Color3.fromRGB(0, 210, 255)  
+    },
+    Lava = {
+        Color1 = Color3.fromRGB(50, 5, 5),    
+        Color2 = Color3.fromRGB(220, 50, 0),  
+        Color3 = Color3.fromRGB(255, 140, 0)  
+    }
+}
+
+local function getThemeColor(t, offset)
+    local theme = THEMES[currentTheme]
+    local cycle = (t * 0.3 + (offset * 0.1)) % 1
+    if cycle < 0.5 then
+        return theme.Color1:Lerp(theme.Color2, cycle * 2)
+    else
+        return theme.Color2:Lerp(theme.Color3, (cycle - 0.5) * 2)
+    end
+end
+
+local function getOff(base, target) return base:ToObjectSpace(target) end
+
+local baseRef = CFrame.new(-23.083934783935547, 8.692723274230957, -19.404958724975586)
+
+local TridentParts = {
+    getOff(baseRef, CFrame.new(-23.083934783935547, 8.692723274230957, -19.404958724975586, -0.03617134690284729, 0.9991215467453003, 0.020988252013921738, -0.006601352244615555, 0.02076147124171257, -0.9997590184211731, -0.9993201494216919, -0.03630201518535614, 0.00584688875824213)),
+    getOff(baseRef, CFrame.new(-23.40496826171875, 8.50462532043457, -25.513385772705078, -0.03618938848376274, -0.04690145328640938, 0.9982470273971558, -0.00664691673591733, 0.998887300491333, 0.046690914779901505, -0.999322772026062, -0.0049453494139015675, -0.03646566718816757)),
+    getOff(baseRef, CFrame.new(-23.311445236206055, 10.33430004119873, -30.93269157409668, -0.02822447381913662, 0.005033478606492281, -0.9995889663696289, -0.38129445910453796, -0.9244343638420105, 0.006111040711402893, -0.9240227937698364, 0.38131001591682434, 0.028010083362460136)),
+    getOff(baseRef, CFrame.new(-23.6221866607666, 6.6700310707092285, -30.4427547454834, -0.04381492733955383, 0.0031746281310915947, 0.9990326166152954, 0.46808770298957825, 0.883501410484314, 0.01772364042699337, -0.8825901746749878, 0.4684132933616638, -0.04019783437252045)),
+    getOff(baseRef, CFrame.new(-23.540048599243164, 12.844759941101074, -28.556575775146484, -0.03469054773449898, 0.021895023062825203, 0.9991574287414551, 0.28576281666755676, 0.9582362771034241, -0.01107664406299591, -0.9576717615127563, 0.2851382791996002, -0.03949829190969467)),
+    getOff(baseRef, CFrame.new(-23.254436492919922, 3.705022096633911, -28.54642677307129, -0.0281155314296484, 0.005011766217648983, -0.9995931386947632, -0.3812951147556305, -0.9244351387023926, 0.006089231930673122, -0.9240274429321289, 0.3813106119632721, 0.027899563312530518)),
+    getOff(baseRef, CFrame.new(-24.960163116455078, 8.428670883178711, -30.05898666381836, 0.37056219577789307, -0.926437497138977, -0.0663582906126976, -0.006164305843412876, -0.07390060275793076, 0.9972468018531799, -0.9287871718406677, -0.36913448572158813, -0.0330977700650692)),
+    getOff(baseRef, CFrame.new(-21.692916870117188, 8.472673416137695, -30.258499145507812, -0.46158212423324585, -0.8868994116783142, -0.01859288476407528, -0.005935670807957649, -0.017875967547297478, 0.9998268485069275, -0.8870786428451538, 0.46161478757858276, 0.002985365455970168)),
+    getOff(baseRef, CFrame.new(-28.117612838745117, 8.386518478393555, -26.80539894104004, -0.4615859091281891, -0.8868986368179321, -0.018590841442346573, -0.005935165099799633, -0.017872221767902374, 0.9998254179954529, -0.8870763182640076, 0.46161720156669617, 0.0029846783727407455)),
+    getOff(baseRef, CFrame.new(-18.573322296142578, 8.489853858947754, -27.18634796142578, 0.37056219577789307, -0.9264342784881592, -0.06635763496160507, -0.0061682406812906265, -0.0738971009850502, 0.9972468018531799, -0.9287871718406677, -0.36913272738456726, -0.0330980159342289)),
+    getOff(baseRef, CFrame.new(-23.770938873291016, 8.373283386230469, -38.90528869628906, -0.036167360842227936, -0.9993458986282349, -0.0025228860322386026, -0.006613378878682852, -0.0022882127668708563, 0.99997878074646, -0.9993271827697754, 0.036180511116981506, -0.006527638528496027)),
+    getOff(baseRef, CFrame.new(-24.166534423828125, 8.296823501586914, -49.200347900390625, -0.036167778074741364, -0.9993468523025513, -0.002522444585338235, -0.006613203790038824, -0.002288669114932418, 0.9999797344207764, -0.9993281364440918, 0.036180153489112854, -0.006527843419462442)),
+    getOff(baseRef, CFrame.new(-24.52116584777832, 8.234665870666504, -58.63132858276367, -0.036177292466163635, -0.9993454217910767, -0.002534503350034356, -0.0066086603328585625, -0.0022998875938355923, 0.99997878074646, -0.9993268251419067, 0.03619055077433586, -0.0065224505960941315)),
+    getOff(baseRef, CFrame.new(-26.3181209564209, 8.33169937133789, -59.95994567871094, 0.37056219577789307, -0.9264346361160278, -0.06635989993810654, -0.006165758706629276, -0.07389917224645615, 0.9972468018531799, -0.9287871718406677, -0.3691330552101135, -0.033096786588430405)),
+    getOff(baseRef, CFrame.new(-22.692445755004883, 8.316539764404297, -60.17877960205078, -0.46158072352409363, -0.8869025707244873, -0.018597330898046494, -0.005935803987085819, -0.01787703111767769, 0.9998236298561096, -0.887078583240509, 0.46161022782325745, 0.00298686558380723))
+}
+
+local function moveProp(index, targetCF)
+    local prop = wingRemoteCache[index]
+    if not prop or not prop.Parent then return end
+    if currentCFrames[index] then
+        currentCFrames[index] = currentCFrames[index]:Lerp(targetCF, 0.4)
+    else
+        currentCFrames[index] = targetCF
+    end
+end
+
+local FlingBallTarget = nil
+local activeFlingBall = nil
+
+RS.Heartbeat:Connect(function()
+    if activeFlingBall and FlingBallTarget then
+        pcall(function()
+            activeFlingBall.Anchored = false
+            activeFlingBall.CFrame = typeof(FlingBallTarget) == "CFrame" and (FlingBallTarget * CFrame.Angles(math.rad(math.random(-10000, 10000)), math.rad(math.random(-10000, 10000)), math.rad(math.random(-10000, 10000)))) or CFrame.new(FlingBallTarget) * CFrame.Angles(math.rad(math.random(-10000, 10000)), math.rad(math.random(-10000, 10000)), math.rad(math.random(-10000, 10000)))
+            activeFlingBall.Velocity = Vector3.new(50000, 50000, 50000)
+            activeFlingBall.RotVelocity = Vector3.new(50000, 50000, 50000)
+            activeFlingBall.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+            activeFlingBall.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+        end)
+    end
+end)
+
+local function GetBall()
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if LP.Backpack:FindFirstChild("SoccerBall") and hum then
+        hum:EquipTool(LP.Backpack.SoccerBall)
+    end
+    
+    local ballCom = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls")
+    local ball = ballCom and ballCom:WaitForChild("Soccer" .. LP.Name, 3)
+    
+    if ball then 
+        ball.CanCollide = true
+        ball.Anchored = false
+    end
+    
+    return ball
+end
+
+local function applyFlingVelocity(ball, targetCFrame)
+    if not ball then return end
+    activeFlingBall = ball
+    FlingBallTarget = targetCFrame
+end
+
+local SoulCombo = {
+    [1] = {Rot = CFrame.Angles(0, math.rad(180), 0), Speed = 5},
+    [2] = {Rot = CFrame.Angles(0, math.rad(180), 0), Speed = 5},
+    [3] = {Rot = CFrame.Angles(0, math.rad(180), 0), Speed = 5}
+}
+
+local function ExecuteSoulSlash()
+    if soulSlashActive or #wingRemoteCache < 1 then return end
+    soulSlashActive = true
+    local Ball = GetBall()
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not root then soulSlashActive = false return end
+    
+    local config = SoulCombo[comboStep]
+
+    task.spawn(function()
+        local spin, startTime, duration = 0, tick(), 0.38
+        while tick() - startTime < duration do
+            spin = spin + config.Speed
+            local motionCF = root.CFrame * CFrame.new(0, 0, -38) * config.Rot * CFrame.Angles(0, 0, spin)
+            for i, partOff in ipairs(TridentParts) do moveProp(i, motionCF * partOff) end
+            
+            local foundTarget = false
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local pRoot = p.Character.HumanoidRootPart
+                    if (pRoot.Position - (root.CFrame * CFrame.new(0,0,-5)).Position).Magnitude < 16 then
+                        applyFlingVelocity(Ball, pRoot.CFrame)
+                        foundTarget = true
+                    end
+                end
+            end
+            if not foundTarget then FlingBallTarget = nil end
+            RS.Heartbeat:Wait()
+        end
+        FlingBallTarget = nil
+        comboStep = (comboStep % 3) + 1
+        soulSlashActive = false
+    end)
+end
+
+local function ExecuteHollowSlash(targetPlr)
+    if isAttacking then return end
+    isAttacking = true
+    local Ball = GetBall()
+    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+
+    task.spawn(function()
+        local currentPos = myRoot and myRoot.Position or Vector3.new(0,0,0)
+        local progress = 0
+        currentHollowSpin = 0
+
+        while isAttacking and targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") do
+            local root = targetPlr.Character.HumanoidRootPart
+            local targetPos = root.Position + (root.Velocity * 0.18)
+
+            if progress < 1 then
+                progress = progress + (RS.Heartbeat:Wait() * HOLLOW_SPEED)
+                if progress > 1 then progress = 1 end
+            end
+
+            currentPos = currentPos:Lerp(targetPos, progress)
+
+            applyFlingVelocity(Ball, CFrame.new(currentPos))
+
+            currentHollowSpin = currentHollowSpin + HOLLOW_SPIN_SPEED
+
+            local lookRotation = CFrame.lookAt(currentPos, targetPos).Rotation
+            local customAngle = CFrame.Angles(math.rad(HOLLOW_ROT_X), math.rad(HOLLOW_ROT_Y), math.rad(HOLLOW_ROT_Z + currentHollowSpin))
+            local tridentCF = CFrame.new(currentPos + HOLLOW_OFFSET) * lookRotation * customAngle
+
+            for i, offset in ipairs(TridentParts) do
+                moveProp(i, tridentCF * offset)
+            end
+
+            if progress >= 1 then
+                applyFlingVelocity(Ball, root.CFrame)
+                task.wait(0.1)
+                break
+            end
+            RS.Heartbeat:Wait()
+        end
+        FlingBallTarget = nil
+        isAttacking = false
+    end)
+end
+
+local function ExecutePhantomRush()
+    if skill2Active then return end
+    skill2Active = true
+    local Ball = GetBall()
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then skill2Active = false return end
+
+    local oldSpeed = hum.WalkSpeed
+    hum.WalkSpeed = 80
+    
+    task.spawn(function()
+        local start = tick()
+        while tick() - start < 0.5 and skill2Active do
+            local baseCF = root.CFrame * CFrame.new(4, 2.3, -39.9) * CFrame.Angles(0, math.rad(180), 0)
+            for i, offset in ipairs(TridentParts) do moveProp(i, baseCF * offset) end
+            
+            local foundTarget = false
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    if (p.Character.HumanoidRootPart.Position - root.Position).Magnitude < 20 then
+                        applyFlingVelocity(Ball, p.Character.HumanoidRootPart.CFrame)
+                        foundTarget = true
+                    end
+                end
+            end
+            if not foundTarget then FlingBallTarget = nil end
+            RS.Heartbeat:Wait()
+        end
+        FlingBallTarget = nil
+        hum.WalkSpeed = oldSpeed
+        skill2Active = false
+    end)
+end
+
+local function ExecuteDeathSpin()
+    if deathSpinActive or #wingRemoteCache < 1 then return end
+    deathSpinActive = true
+    local Ball = GetBall()
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then deathSpinActive = false return end
+
+    local oldSpeed = hum.WalkSpeed
+    hum.WalkSpeed = 50
+    
+    task.spawn(function()
+        local start, spin = tick(), 0
+        while tick() - start < 8 and deathSpinActive do
+            spin = spin + 0.9
+            local motionCF = root.CFrame * CFrame.new(4, 2, -35) * CFrame.Angles(0, math.rad(180), 90) * CFrame.Angles(0, 0, spin)
+            for i, partOff in ipairs(TridentParts) do moveProp(i, motionCF * partOff) end
+            
+            local foundTarget = false
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local pRoot = p.Character.HumanoidRootPart
+                    if (pRoot.Position - (root.CFrame * CFrame.new(0, 0,-6)).Position).Magnitude < 22 then
+                        applyFlingVelocity(Ball, pRoot.CFrame)
+                        foundTarget = true
+                    end
+                end
+            end
+            if not foundTarget then FlingBallTarget = nil end
+            RS.Heartbeat:Wait()
+        end
+        FlingBallTarget = nil
+        hum.WalkSpeed = oldSpeed
+        deathSpinActive = false
+    end)
+end
+
+local Gui = Instance.new("ScreenGui", game.CoreGui)
+Gui.DisplayOrder = 2147483647
+
+local Main = Instance.new("Frame", Gui)
+Main.Size, Main.Position = UDim2.new(0, 200, 0, 360), UDim2.new(0.5, -100, 0.4, 0)
+Main.BackgroundColor3, Main.BorderSizePixel = Color3.fromRGB(255, 255, 255), 0
+Main.Active, Main.Draggable, Main.ClipsDescendants = true, true, true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+local MainGrad = Instance.new("UIGradient", Main)
+
+local function updateGUITheme()
+    local theme = THEMES[currentTheme]
+    MainGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, theme.Color1), 
+        ColorSequenceKeypoint.new(0.4, theme.Color2),
+        ColorSequenceKeypoint.new(0.5, Color3.new(1,1,1)), 
+        ColorSequenceKeypoint.new(0.6, theme.Color2),
+        ColorSequenceKeypoint.new(1, theme.Color1)
+    })
+end
+
+updateGUITheme()
+
+task.spawn(function()
+    while true do
+        TS:Create(MainGrad, TweenInfo.new(4, Enum.EasingStyle.Linear), {Offset = Vector2.new(1, 0)}):Play()
+        task.wait(4)
+        MainGrad.Offset = Vector2.new(-1, 0)
+    end
+end)
+
+local Header = Instance.new("Frame", Main)
+Header.Size, Header.BackgroundTransparency = UDim2.new(1, 0, 0, 45), 1
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size, Title.Position, Title.Text = UDim2.new(1, -40, 0, 25), UDim2.new(0, 10, 0, 5), "Yvtal Spear"
+Title.TextColor3, Title.Font, Title.TextSize, Title.BackgroundTransparency = Color3.new(1, 1, 1), Enum.Font.SourceSansBold, 15, 1
+
+local Credits = Instance.new("TextLabel", Header)
+Credits.Size, Credits.Position, Credits.Text = UDim2.new(1, -40, 0, 15), UDim2.new(0, 10, 0, 22), "by DYTON_txt, md RIFF"
+Credits.TextColor3, Credits.Font, Credits.TextSize, Credits.BackgroundTransparency = Color3.new(1, 1, 1), Enum.Font.Code, 10, 1
+
+local MinBtn = Instance.new("TextButton", Header)
+MinBtn.Size, MinBtn.Position = UDim2.new(0, 25, 0, 25), UDim2.new(1, -30, 0, 10)
+MinBtn.BackgroundColor3, MinBtn.BackgroundTransparency, MinBtn.Text = Color3.new(0,0,0), 0.6, "▲"
+MinBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", MinBtn)
+
+local Content = Instance.new("Frame", Main)
+Content.Size, Content.Position, Content.BackgroundTransparency = UDim2.new(1, 0, 1, -85), UDim2.new(0, 0, 0, 45), 1
+
+local function createBtn(name, pos, func)
+    local b = Instance.new("TextButton", Content)
+    b.Size, b.Position = UDim2.new(0.9, 0, 0, 32), pos
+    b.BackgroundColor3, b.BackgroundTransparency = Color3.new(0,0,0), 0.4
+    b.Text, b.TextColor3, b.Font, b.TextSize = name, Color3.new(1, 1, 1), Enum.Font.SourceSansBold, 12
+    Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(func)
+    return b
+end
+
+createBtn("SUMMON Spear", UDim2.new(0.05, 0, 0, 5), function()
+    petMode = not petMode
+    if petMode then
+        local p = workspace:WaitForChild("WorkspaceCom"):WaitForChild("001_TrafficCones")
+        wingRemoteCache = {}
+        for _, v in ipairs(p:GetChildren()) do if v.Name:find("Prop" .. OwnerName) then table.insert(wingRemoteCache, v) end end
+    end
+end)
+
+createBtn("Spinning Stab (BASIC)", UDim2.new(0.05, 0, 0, 42), function()
+    if LP.Backpack:FindFirstChild("Spear Attack") then return end
+    local t = Instance.new("Tool", LP.Backpack)
+    t.Name, t.RequiresHandle = "Spear Attack", false
+    t.Activated:Connect(ExecuteSoulSlash)
+end)
+
+createBtn("Eternal spear throw", UDim2.new(0.05, 0, 0, 79), function()
+    if LP.Backpack:FindFirstChild("True Trow") then return end
+    local t = Instance.new("Tool", LP.Backpack)
+    t.Name, t.RequiresHandle = "True Trow", false
+    t.Activated:Connect(function()
+        local mouse = LP:GetMouse()
+        local targetInstance = mouse.Target
+        local target = nil
+
+        if targetInstance and targetInstance.Parent and targetInstance.Parent:FindFirstChild("HumanoidRootPart") then
+            local possiblePlr = Players:GetPlayerFromCharacter(targetInstance.Parent)
+            if possiblePlr and possiblePlr ~= LP then
+                target = possiblePlr
+            end
+        end
+
+        if not target then
+            local mousePos = mouse.Hit.Position
+            local closestDist = math.huge
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (p.Character.HumanoidRootPart.Position - mousePos).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        target = p
+                    end
+                end
+            end
+        end
+
+        if target then ExecuteHollowSlash(target) end
+    end)
+end)
+
+createBtn("ambush spear advance", UDim2.new(0.05, 0, 0, 116), ExecutePhantomRush)
+createBtn("cycle of disasters", UDim2.new(0.05, 0, 0, 153), ExecuteDeathSpin)
+
+createBtn("Regeneration trident", UDim2.new(0.05, 0, 0, 190), function()
+    isAttacking, skill2Active, soulSlashActive, deathSpinActive = false, false, false, false
+    FlingBallTarget = nil
+    if LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then LP.Character.Humanoid.WalkSpeed = 16 end
+end)
+
+local ThemeBtn = createBtn("Mode: ABYSSAL SHARK", UDim2.new(0.05, 0, 0, 227), function() end)
+ThemeBtn.MouseButton1Click:Connect(function()
+    if currentTheme == "Water" then
+        currentTheme = "Lava"
+        ThemeBtn.Text = "Mode: VULCANO"
+    else
+        currentTheme = "Water"
+        ThemeBtn.Text = "Mode: ABYSSAL SHARK"
+    end
+    updateGUITheme()
+end)
+
+local Footer = Instance.new("TextLabel", Main)
+Footer.Size, Footer.Position, Footer.Text = UDim2.new(1, 0, 0, 20), UDim2.new(0, 0, 1, -20), "Sin Of Greed stage 1"
+Footer.TextColor3, Footer.Font, Footer.TextSize, Footer.BackgroundTransparency, Footer.BackgroundColor3 = Color3.new(1,1,1), Enum.Font.SourceSansItalic, 10, 0.8, Color3.new(0,0,0)
+
+MinBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 200, 0, 45) or UDim2.new(0, 200, 0, 395)
+    MinBtn.Text = isMinimized and "▼" or "▲"
+
+    if isMinimized then
+        Content.Visible = false
+        Footer.Visible = false
+    end
+
+    local tween = TS:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = targetSize})
+    tween:Play()
+
+    if not isMinimized then
+        tween.Completed:Connect(function()
+            if not isMinimized then
+                Content.Visible = true
+                Footer.Visible = true
+            end
+        end)
+    end
+end)
+
+RS.Heartbeat:Connect(function(dt)
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local totalProps = #wingRemoteCache
+
+    if not root or not petMode or totalProps < 1 then return end
+
+    local t = tick()
+
+    if not (isAttacking or skill2Active or soulSlashActive or deathSpinActive) then
+        currentIdleSpin = currentIdleSpin + IDLE_SPIN_SPEED
+        local wave = math.sin(t * FLOAT_SPEED) * FLOAT_AMPLITUDE
+
+        local idlePos = root.CFrame * CFrame.new(2, FLOAT_HEIGHT_OFFSET + wave, -25)
+            * CFrame.Angles(math.rad(175), math.rad(0), math.rad(-120 + currentIdleSpin))
+
+        for i, offset in ipairs(TridentParts) do
+            if i <= totalProps then
+                moveProp(i, idlePos * offset)
+            end
+        end
+    end
+
+    local canUpdateColor = (t - lastColorUpdate > 0.06)
+
+    if t - lastNetworkUpdate > 0.014 then
+        for i = 1, totalProps do
+            local prop = wingRemoteCache[i]
+            local targetCFrame = currentCFrames[i]
+
+            if prop and targetCFrame then
+                task.spawn(function()
+                    local cfR = prop:FindFirstChild("SetCurrentCFrame")
+                    if cfR then
+                        pcall(function()
+                            cfR:InvokeServer(targetCFrame)
+                        end)
+                    end
+
+                    if canUpdateColor and i == colorIndex then
+                        local crR = prop:FindFirstChild("ChangePropColor")
+                        if crR then
+                            pcall(function()
+                                crR:InvokeServer(getThemeColor(t, i))
+                            end)
+                        end
+                    end
+                end)
+            end
+        end
+
+        if canUpdateColor then
+            colorIndex = (colorIndex % totalProps) + 1
+            lastColorUpdate = t
+        end
+        lastNetworkUpdate = t
+    end
+end)
