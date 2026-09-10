@@ -1,0 +1,369 @@
+-- [[ MINECRAFT WITHER STORM BOSS - BEDROCK ARTILLERY & FLING OVERLOAD V7.2.0 ]] --
+-- Engine Core: DYTON_txt (Eternatus Anti-Delay Network Framework Integration)
+-- Logic Target: FIX TOTAL RAMAPAGE TARGET ALL & LOCK INDEKS 1-4 TORNADO PERMANEN
+-- Fix Log: Anti-Tentacle Despawn & Offset CFrame Restructure By Josep Bart
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local OwnerName = LP.Name
+local petMode = false
+local rampageMode = false 
+local wingRemoteCache = {}
+local PERMANENT_PROP_LOCK = {} 
+local currentCFrames = {}
+local lastNetworkUpdate = 0
+local lastColorUpdate = 0
+local lastScanTime = 0     
+local colorIndex = 1
+
+-- [[ STATE PROP LOCK INTEGRATION (SIREN HEAD STYLE) ]] --
+local engineActiveState = false 
+local snapNextFrame = false    
+
+-- [[ ETERNATUS OPTIMIZATION NETWORK CACHE ]] --
+local remoteDebounce = {}
+
+-- [[ ANIMATION & ADAPTIVE SYSTEM VARIABLES ]] --
+local isSummoning = false
+local summonStartTime = 0
+local summonOriginPos = Vector3.zero
+local rampageBlacklist = {} 
+local targetAttackTrack = { player = nil, startTime = 0, initialPos = Vector3.zero }
+local hasFetchedBall = false 
+
+-- [[ ADAPTIVE VARIABLE CONTROL ]] --
+local estimatedPing = 0.03   
+local witherCurrentPos = Vector3.zero 
+local lastAttackTime = 0
+local activeProjectiles = {} 
+local lastLookAtPos = Vector3.zero 
+
+-- =============================================================================
+-- [[ CONFIGURASI MANUAL WITHER STORM - BY JOSEP BART ]] --
+-- =============================================================================
+local WITHER_SPEED = 3         
+local PROJECTILE_SPEED = 20    
+local ATTACK_COOLDOWN = 0.5    
+local HOVER_HEIGHT = 30        
+local RANDOM_DRIFT_SCALE = 60   
+local RAMPAGE_RADIUS = 800     
+
+local SUMMON_DURATION = 4.5   
+local IMPACT_LINGER_TIME = 0.5 
+local MAX_STUCK_TIME = 5.0    
+
+local PET_OFFSET = Vector3.new(-1, 50, 5) 
+local MANUAL_ROTATION = Vector3.new(90, 360, 180) 
+local TargetPlayer = nil       
+-- =============================================================================
+
+local COLORS = {
+      AbyssRed = Color3.fromRGB(120, 0, 200),   
+    DarkAbyss = Color3.fromRGB(20, 0, 40), 
+    Void = Color3.fromRGB(5, 0, 10),
+    Accent = Color3.fromRGB(255, 255, 255),
+    SuccessGreen = Color3.fromRGB(0, 255, 120),
+    WarningRed = Color3.fromRGB(255, 30, 60),
+    
+    PureWhiteOnly = Color3.fromRGB(255, 255, 255),
+    SoulArmorWhite = Color3.fromRGB(15, 15, 25),
+    SoulAuraBlue = Color3.fromRGB(130, 50, 250)
+}
+
+local function getAbyssColor(t, offset)
+    if not engineActiveState then
+        return COLORS.DarkAbyss
+    end
+    if isSummoning then
+        return COLORS.PureWhiteOnly
+    elseif rampageMode then
+        local cycle = (t * 1.5 + (offset * 0.15)) % 1
+        return cycle < 0.5 and COLORS.SoulArmorWhite:Lerp(COLORS.SoulAuraBlue, cycle * 2) or COLORS.SoulAuraBlue:Lerp(COLORS.SoulArmorWhite, (cycle - 0.5) * 2)
+    else
+        local cycle = (t * 0.3 + (offset * 0.1)) % 1
+        return cycle < 0.5 and COLORS.AbyssRed:Lerp(COLORS.DarkAbyss, cycle * 2) or COLORS.DarkAbyss:Lerp(COLORS.Void, (cycle - 0.5) * 2)
+    end
+end
+
+local function getOff(base, target) return base:ToObjectSpace(target) end
+
+-- =============================================================================
+-- [[ BASE MATRIX COORDS STRUCTURE - ASSET MATRIKS WITHER ]] --
+-- =============================================================================
+local baseRef = CFrame.new(-16.9119, 79.1086, 471.9245, -0.9739, -0.2167, 0.0667, 0.0000, -0.2942, -0.9558, 0.2268, -0.9308, 0.2865)
+
+local WitherParts = {
+    getOff(baseRef, CFrame.new(-16.9119, 79.1086, 471.9245, -0.9739, -0.2167, 0.0667, 0.0000, -0.2942, -0.9558, 0.2268, -0.9308, 0.2865)),
+    getOff(baseRef, CFrame.new(-16.7634, 79.1087, 471.9492, 0.9740, -0.1123, -0.1970, 0.0000, -0.8687, 0.4953, -0.2267, -0.4824, -0.8461)),
+    getOff(baseRef, CFrame.new(-11.3106, 83.9800, 467.6347, -0.9776, 0.2083, -0.0286, 0.0000, -0.1359, -0.9907, -0.2103, -0.9685, 0.1329)),
+    getOff(baseRef, CFrame.new(-10.9563, 83.8844, 467.7962, 0.9776, 0.1112, 0.1784, -0.0000, -0.8485, 0.5291, 0.2103, -0.5173, -0.8295)),
+    getOff(baseRef, CFrame.new(-23.8944, 82.7650, 475.4987, -0.5501, -0.8085, 0.2091, 0.0001, -0.2504, -0.9681, 0.8351, -0.5326, 0.1378)),
+    getOff(baseRef, CFrame.new(-22.8474, 81.3205, 475.9934, 0.5502, -0.5197, -0.6536, -0.0000, -0.7827, 0.6224, -0.8350, -0.3425, -0.4307)),
+    getOff(baseRef, CFrame.new(-18.7107, 76.9817, 464.5611, 0.0812, 0.2892, -0.9538, -0.9738, 0.2269, -0.0141, 0.2124, 0.9300, 0.3000)),
+    getOff(baseRef, CFrame.new(-9.7850, 83.0596, 460.0443, -0.9839, -0.1779, -0.0183, -0.0500, 0.1756, 0.9832, -0.1713, 0.9680, -0.1817)),
+    getOff(baseRef, CFrame.new(-30.3493, 80.5980, 470.9733, -0.5898, 0.7778, -0.2172, 0.0249, 0.2864, 0.9578, 0.8072, 0.5595, -0.1883)),
+    getOff(baseRef, CFrame.new(-16.2738, 73.9032, 472.6363, -0.9327, -0.3517, 0.0803, -0.0000, -0.2226, -0.9749, 0.3607, -0.9093, 0.2076)),
+    getOff(baseRef, CFrame.new(-12.4322, 78.8296, 469.3753, -0.9497, 0.2671, -0.1635, 0.0683, -0.3329, -0.9405, -0.3057, -0.9042, 0.2980)),
+    getOff(baseRef, CFrame.new(-24.0206, 76.8890, 476.6813, -0.5623, -0.7698, 0.3020, 0.1420, -0.4497, -0.8818, 0.8146, -0.4530, 0.3622)),
+    getOff(baseRef, CFrame.new(-8.7898, 82.7740, 473.7161, -0.5061, 0.8443, 0.1764, 0.0659, 0.2418, -0.9681, -0.8599, -0.4784, -0.1780)),
+    getOff(baseRef, CFrame.new(4.0930, 86.0446, 466.4489, -0.5061, 0.3923, 0.7681, 0.0660, 0.9056, -0.4190, -0.8599, -0.1614, -0.4842)),
+    getOff(baseRef, CFrame.new(10.5116, 98.9836, 463.9698, -0.8588, -0.2632, 0.4396, -0.0001, 0.8581, 0.5135, -0.5123, 0.4410, -0.7369)),
+    getOff(baseRef, CFrame.new(-12.7945, 70.4663, 476.6720, 0.7180, 0.6499, 0.2494, -0.1157, -0.2419, 0.9634, 0.6864, -0.7206, -0.0985)), -- Josep Fix: Memperbaiki typo nilai koordinat ke-11
+    getOff(baseRef, CFrame.new(-3.4715, 66.8050, 466.3440, 0.7180, 0.3677, 0.5910, -0.1157, -0.7742, 0.6223, 0.6864, -0.5152, -0.5134)),
+    getOff(baseRef, CFrame.new(1.8168, 55.8256, 459.1510, 0.7879, 0.0424, 0.6144, 0.0001, -0.9976, 0.0687, 0.6158, -0.0541, -0.7860)),
+    getOff(baseRef, CFrame.new(-22.3337, 77.5828, 481.9007, -0.2780, -0.8498, -0.4479, -0.0625, -0.4493, 0.8912, -0.9585, 0.2758, 0.0718)),
+    getOff(baseRef, CFrame.new(-34.5694, 71.6353, 486.0936, -0.2780, -0.9349, 0.2206, -0.0626, 0.2468, 0.9670, -0.9585, 0.2550, -0.1271)),
+    getOff(baseRef, CFrame.new(-48.4260, 74.9304, 489.4897, -0.7203, -0.6342, -0.2810, -0.6654, 0.7462, 0.0214, 0.1961, 0.2024, -0.9594)),
+    getOff(baseRef, CFrame.new(-15.1279, 89.4441, 474.7134, -0.9593, -0.0335, 0.2805, 0.0411, -0.9989, 0.0212, 0.2793, 0.0319, 0.9597)),
+    getOff(baseRef, CFrame.new(-9.0062, 86.1171, 479.5620, 0.5727, -0.1939, -0.7965, 0.1545, -0.9287, 0.3371, -0.8051, -0.3162, -0.5019)),
+    getOff(baseRef, CFrame.new(-19.4777, 87.2483, 482.7247, -0.2729, -0.1193, 0.9546, -0.2282, -0.9559, -0.1847, 0.9346, -0.2682, 0.2336)),
+    getOff(baseRef, CFrame.new(-11.3998, 85.2744, 490.0735, 0.9593, -0.1656, -0.2289, -0.0412, -0.8834, 0.4668, -0.2793, -0.4384, -0.8543)),
+    getOff(baseRef, CFrame.new(-14.0756, 76.7244, 480.1296, -0.9593, -0.1192, 0.2562, 0.0412, -0.9559, -0.2906, 0.2793, -0.2681, 0.9220))
+}
+
+local function GetBallSilent()
+    local b = LP.Backpack:FindFirstChild("SoccerBall") or (LP.Character and LP.Character:FindFirstChild("SoccerBall"))
+    if not b and not hasFetchedBall then 
+        hasFetchedBall = true
+        pcall(function()
+            game:GetService("ReplicatedStorage").RE:FindFirstChild("1Too1l"):InvokeServer("PickingTools", "SoccerBall")
+        end)
+    end
+    local ballsFolder = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls")
+    if ballsFolder then
+        local ball = ballsFolder:FindFirstChild("Soccer" .. LP.Name)
+        if ball then ball.CanCollide = false return ball end
+    end
+    return nil
+end
+
+local function FindNearestPrey()
+    local nearestPlayer = nil
+    local shortestDistance = RAMPAGE_RADIUS
+    local myPos = witherCurrentPos
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and not rampageBlacklist[p.Name] then
+            local char = p.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 and not hum.Sit then 
+                    local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")
+                    if torso then
+                        local dist = (myPos - torso.Position).Magnitude
+                        if dist < shortestDistance then
+                            shortestDistance = dist
+                            nearestPlayer = p
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nearestPlayer
+end
+
+-- [[ GUI SYSTEM V7.2.0 ]] --
+local sg = Instance.new("ScreenGui", CoreGui)
+sg.Name = "Abyss_WitherStorm_Control"
+local main = Instance.new("Frame", sg)
+main.Size, main.Position = UDim2.new(0, 190, 0, 165), UDim2.new(0.05, 0, 0.4, 0) 
+main.BackgroundColor3, main.BorderSizePixel = Color3.fromRGB(15, 5, 20), 0
+main.ClipsDescendants = true
+
+local titleBar = Instance.new("Frame", main)
+titleBar.Size, titleBar.BackgroundColor3 = UDim2.new(1, 0, 0, 25), Color3.fromRGB(35, 10, 45)
+titleBar.BorderSizePixel = 0
+
+local titleLabel = Instance.new("TextLabel", titleBar)
+titleLabel.Size, titleLabel.Position = UDim2.new(1, -10, 1, 0), UDim2.new(0, 5, 0, 0)
+titleLabel.BackgroundTransparency, titleLabel.Text = 1, "Wither Storm Apocalypse V7.2.0"
+titleLabel.TextColor3, titleLabel.Font, titleLabel.TextSize = Color3.new(1, 1, 1), Enum.Font.SourceSansBold, 12
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local ballStatusLabel = Instance.new("TextLabel", main)
+ballStatusLabel.Size = UDim2.new(1, -10, 0, 15)
+ballStatusLabel.Position = UDim2.new(0, 5, 1, -30)
+ballStatusLabel.BackgroundTransparency = 1
+ballStatusLabel.Text = "STORM: IDLE..."
+ballStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ballStatusLabel.Font = Enum.Font.Code
+ballStatusLabel.TextSize = 10
+ballStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local creditLabel = Instance.new("TextLabel", main)
+creditLabel.Size, creditLabel.Position = UDim2.new(1, 0, 0, 15), UDim2.new(0, 0, 1, -15)
+creditLabel.BackgroundTransparency, creditLabel.Text = 1, "Engine: Dyton + Josep Bart"
+creditLabel.TextColor3, creditLabel.Font, creditLabel.TextSize = COLORS.Accent, Enum.Font.Code, 10
+
+local dragging, dragStart, startPos
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging, dragStart, startPos = true, input.Position, main.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+                            
+                        if canUpdateColor and i == colorIndex then
+                            local crR = prop:FindFirstChild("ChangePropColor")
+                            if crR then pcall(function() crR:InvokeServer(getAbyssColor(t, i)) end) end
+                        end
+                        
+                        task.wait(0.02)
+                        remoteDebounce[i] = false
+                    end)
+                end
+            end
+            if canUpdateColor then
+                colorIndex = (colorIndex % totalProps) + 1
+                lastColorUpdate = t
+            end
+            lastNetworkUpdate = t
+        end
+        return 
+    end
+
+    local activeBall = GetBallSilent()
+    local flingActiveThisFrame = false
+    
+    for _, proj in pairs(activeProjectiles) do
+        if proj.IsStuck then flingActiveThisFrame = true break end
+    end
+    
+    if isSummoning then
+        ballStatusLabel.Text = "STORM: AWAKENING..."
+        ballStatusLabel.TextColor3 = COLORS.PureWhiteOnly
+    elseif not activeBall then
+        ballStatusLabel.Text = "BALL: MISSING / RE-FETCHING"
+        ballStatusLabel.TextColor3 = COLORS.WarningRed
+    elseif flingActiveThisFrame then
+        ballStatusLabel.Text = "STORM: OBLITERATING TARGET"
+        ballStatusLabel.TextColor3 = COLORS.SoulAuraBlue
+    else
+        ballStatusLabel.Text = rampageMode and "STORM: RAMPAGE TARGET ALL" or "STORM: INJECTED HOVER LOCK"
+        ballStatusLabel.TextColor3 = rampageMode and COLORS.SoulAuraBlue or COLORS.SuccessGreen
+    end
+
+    if rampageMode and not isSummoning then
+        if TargetPlayer then
+            local enemyChar = TargetPlayer.Character
+            local enemyHum = enemyChar and enemyChar:FindFirstChildOfClass("Humanoid")
+            local enemyTorso = getTargetTorso(TargetPlayer)
+            
+            if not enemyChar or not enemyHum or enemyHum.Health <= 0 or enemyHum.Sit or rampageBlacklist[TargetPlayer.Name] or not Players:FindFirstChild(TargetPlayer.Name) then
+                TargetPlayer = nil
+            elseif enemyTorso then
+                local currentVelocity = enemyTorso.AssemblyLinearVelocity.Magnitude
+                local distanceMoved = (enemyTorso.Position - targetAttackTrack.initialPos).Magnitude
+                
+                if currentVelocity > 150 or (flingActiveThisFrame and distanceMoved > 100) then
+                    rampageBlacklist[TargetPlayer.Name] = true 
+                    TargetPlayer = nil 
+                elseif t - targetAttackTrack.startTime > MAX_STUCK_TIME and distanceMoved < 5 then
+                    rampageBlacklist[TargetPlayer.Name] = true 
+                    TargetPlayer = nil 
+                end
+            end
+        end
+        
+                if snapNextFrame then
+            currentCFrames[i] = targetCF
+        else
+            currentCFrames[i] = (currentCFrames[i] or targetCF):Lerp(targetCF, lerpAlpha)
+        end
+    end
+
+    if snapNextFrame then
+        snapNextFrame = false 
+    end
+
+    if TargetPlayer and getTargetTorso(TargetPlayer) and not isSummoning then
+        if t - lastAttackTime > ATTACK_COOLDOWN then
+            lastAttackTime = t 
+            
+            local availableAuras = {}
+            for auraId = 1, 4 do 
+                if not activeProjectiles[auraId] then
+                    table.insert(availableAuras, auraId)
+                end
+            end
+            
+            local freeCount = #availableAuras
+            if freeCount > 0 then
+                local burstCount = math.random(1, math.min(2, freeCount)) 
+                local enemyTorso = getTargetTorso(TargetPlayer)
+                
+                task.defer(function()
+                    for k = 1, burstCount do
+                        local auraId = availableAuras[k]
+                        local randomHeadId = math.random(5, 10)
+                        local headCFrame = currentCFrames[randomHeadId]
+                        
+                        if headCFrame and enemyTorso and TargetPlayer then
+                            local enemyVelocity = enemyTorso.AssemblyLinearVelocity
+                            local predictedTargetPos = enemyTorso.Position + (enemyVelocity * (dt + 0.05))
+
+                            activeProjectiles[auraId] = {
+                                CurrentPos = headCFrame.Position,
+                                TargetPos = predictedTargetPos,
+                                IsStuck = false,
+                                ImpactTime = 0
+                            }
+                        end
+                        if k < burstCount then task.wait(math.random(5, 10) / 100) end 
+                    end
+                end)
+            end
+        end
+    end
+
+    if t - lastNetworkUpdate > 0.014 then
+        local canUpdateColor = (t - lastColorUpdate > 0.08)
+        local frameCFrames = currentCFrames
+        local startSend = os.clock()
+        
+        for i = 1, totalProps do
+            local prop = wingRemoteCache[i]
+            local targetCFrame = frameCFrames[i]
+            
+            if prop and targetCFrame then
+                task.spawn(function()
+                    if remoteDebounce[i] then return end
+                    remoteDebounce[i] = true
+                    
+                    local cfR = prop:FindFirstChild("SetCurrentCFrame")
+                    if cfR then 
+                        pcall(function() 
+                            cfR:InvokeServer(targetCFrame) 
+                            if i == 1 then
+                                estimatedPing = (estimatedPing * 0.85) + ((os.clock() - startSend) * 0.15)
+                            end
+                        end) 
+                    end
+                    
+                    if canUpdateColor and i == colorIndex then
+                        local crR = prop:FindFirstChild("ChangePropColor")
+                        if crR then pcall(function() crR:InvokeServer(getAbyssColor(t, i)) end) end
+                    end
+                    
+                    task.wait(0.02)
+                    remoteDebounce[i] = false
+                end)
+            end
+        end
+        
+        if canUpdateColor then
+            colorIndex = (colorIndex % totalProps) + 1
+            lastColorUpdate = t
+        end
+        lastNetworkUpdate = t
+    end
+end)
