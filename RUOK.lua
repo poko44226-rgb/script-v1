@@ -1,4 +1,4 @@
-"--deobfuscated by @Watup-Exploitz | discord.gg/EgbzrBqur2
+--deobfuscated by @Watup-Exploitz | discord.gg/EgbzrBqur2
 
 -- ====================================================================
 -- [1] SCRIPT UTAMA / ENGINE KAMU (TEMPEL KODE KAMU DI SINI)
