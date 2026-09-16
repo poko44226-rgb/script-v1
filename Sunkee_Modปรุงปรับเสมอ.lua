@@ -626,7 +626,8 @@ end
     
 local function Button31()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/poko44226-rgb/script-v1/refs/heads/main/%E0%B8%8B%E0%B8%B9%E0%B8%8B%E0%B8%B5%E0%B8%AA%E0%B8%A1%E0%B8%9A%E0%B8%B9%E0%B8%A3%E0%B8%93%E0%B9%8C.lua"))()
--- Button 32: Telegram link copy
+end
+
 local function Button32()
     local link = "t.me/Ansanthia"
     
