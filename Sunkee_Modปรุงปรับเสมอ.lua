@@ -308,7 +308,7 @@ local ButtonNames = {
 -- CREATE BUTTONS
 --==================================================
 
-for i = 1, 36 do
+for i = 1, 37 do
     local button = Instance.new("TextButton")
     button.Name = "Button" .. i
     button.LayoutOrder = i
