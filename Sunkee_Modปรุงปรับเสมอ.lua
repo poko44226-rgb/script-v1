@@ -301,14 +301,15 @@ local ButtonNames = {
     [34] = "วาร์ปหาตู้เซฟ",
     [35] = "อุปกรณ์ประกอบฉากศิลปะ",
     [36] = "มโหรากา",
-    [37] = "เทเลแกรม"
+    [37] = "อุปกรณ์ปั่นป่วน",
+    [38] = "เทเลแกรม"
 }
 
 --==================================================
 -- CREATE BUTTONS
 --==================================================
 
-for i = 1, 37 do
+for i = 1, 38 do
     local button = Instance.new("TextButton")
     button.Name = "Button" .. i
     button.LayoutOrder = i
@@ -622,7 +623,7 @@ local function Button29()
 end
 
 local function Button30()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/poko44226-rgb/script-v1/refs/heads/main/%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B4%E0%B8%94_BombCounter_v2.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/poko44226-rgb/script-v1/refs/heads/main/%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B4%E0%B8%94.lua"))()
 end
     
 local function Button31()
@@ -649,9 +650,11 @@ local function Button36()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/poko44226-rgb/script-v1/refs/heads/main/%E0%B8%A1%E0%B9%82%E0%B8%AB%E0%B8%A3%E0%B8%B2%E0%B8%81%E0%B8%B2.lua"))()
 end
 
-
--- Button 32: Telegram link 
 local function Button37()
+    loadstring(game:HttpGet("https://pastefy.app/s5ENYZWe/raw"))()
+end
+-- Button 32: Telegram link 
+local function Button38()
     local link = "t.me/Ansanthia"
     
     -- Try to copy to clipboard
@@ -715,7 +718,7 @@ local ButtonFunctions = {
     Button21, Button22, Button23, Button24, Button25,
     Button26, Button27, Button28, Button29, Button30,
     Button31, Button32, Button33, Button34, Button35,
-    Button36, Button37,
+    Button36, Button37, Button38,
 }
 
 for i = 1, 37 do
