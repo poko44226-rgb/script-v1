@@ -721,7 +721,7 @@ local ButtonFunctions = {
     Button36, Button37, Button38,
 }
 
-for i = 1, 37 do
+for i = 1, 38 do
     local button = container:FindFirstChild("Button" .. i)
     if button then
         button.Activated:Connect(function()
