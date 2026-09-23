@@ -623,7 +623,7 @@ local function Button29()
 end
 
 local function Button30()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/poko44226-rgb/script-v1/refs/heads/main/%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B4%E0%B8%94.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/poko44226-rgb/script-v1/refs/heads/main/%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B4%E0%B8%94_BombCounter_v2.lua"))()
 end
     
 local function Button31()
