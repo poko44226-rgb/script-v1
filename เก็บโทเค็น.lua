@@ -282,7 +282,7 @@ TeleportButton.MouseButton1Click:Connect(function()
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             player.Character.HumanoidRootPart.Anchored = false
         end
-        TeleportButton.Text = "้ออโต้เก็บโทเค็น | ปิด"
+        TeleportButton.Text = "ออโต้เก็บโทเค็น | ปิด"
         TeleportButton.BackgroundColor3 = Color3.fromRGB(0, 0, 139)
     end
 end)
