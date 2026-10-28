@@ -1,0 +1,220 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+-- FIXED: Parent GUI (lebih reliable)
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "ControlRoom_V2"
+Gui.ResetOnSpawn = false
+Gui.Parent = player:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame", Gui)
+Main.Size = UDim2.new(0, 260, 0, 125)
+Main.Position = UDim2.new(0.5, -130, 0.5, -82)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Main.Active = true
+Main.Draggable = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+local EveryoneButton = Instance.new("TextButton", Main)
+EveryoneButton.Size = UDim2.new(0, 130, 0, 25)
+EveryoneButton.Position = UDim2.new(0, 3, 0, -9)
+EveryoneButton.BackgroundColor3 = Color3.fromRGB(128, 0, 128) -- Purple
+EveryoneButton.Text = "โจมตีทุกคน"
+EveryoneButton.TextColor3 = Color3.new(1, 1, 1)
+EveryoneButton.Font = Enum.Font.GothamBold
+EveryoneButton.TextSize = 13
+EveryoneButton.ZIndex = 5
+Instance.new("UICorner", EveryoneButton).CornerRadius = UDim.new(0, 5)
+
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- UBAH: Merah sedikit tua
+Title.Text = "หลุมดำผู้เล่น v1 | โดย สไปรท์ SPD"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Instance.new("UICorner", Title)
+
+local Box = Instance.new("TextBox", Main)
+Box.Size = UDim2.new(0.9, 0, 0, 50)
+Box.Position = UDim2.new(0.05, 0, 0.3, 0)
+Box.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- UBAH: Hijau Biasa (Normal/Standard Green)
+Box.PlaceholderText = "ชื่อผู้เล่น"
+Box.Text = ""
+Box.TextColor3 = Color3.new(1, 1, 1) -- Teks putih supaya kontras dan jelas
+Box.Font = Enum.Font.GothamSemibold
+Box.TextSize = 17
+Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 6)
+
+local Button = Instance.new("TextButton", Main)
+Button.Size = UDim2.new(0.9, 0, 0, 45)
+Button.Position = UDim2.new(0.05, 0, 0.65, 0)
+Button.BackgroundColor3 = Color3.fromRGB(0, 0, 139) -- Biru Tua
+Button.Text = "ปิด"
+Button.TextColor3 = Color3.new(1, 1, 1)
+Button.TextSize = 18
+Button.Font = Enum.Font.GothamBold
+Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 8)
+
+-- ==================== SISANYA SAMA ====================
+local LocalPlayer = Players.LocalPlayer
+local targetPlayer 
+local targetPart
+local active = false
+local evActive = false
+local renderConn
+
+local Folder = Instance.new("Folder", Workspace)
+local Part = Instance.new("Part", Folder)
+Part.Anchored = true; Part.Transparency = 1; Part.CanCollide = false
+local Attachment1 = Instance.new("Attachment", Part)
+
+if not getgenv().Network then
+    getgenv().Network = {BaseParts = {}, Velocity = Vector3.new(10000, 10000, 10000)}
+    RunService.Heartbeat:Connect(function()
+        pcall(function()
+            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+            for _,p in pairs(getgenv().Network.BaseParts) do
+                if p:IsDescendantOf(Workspace) then 
+                    p.Velocity = getgenv().Network.Velocity 
+                end
+            end
+        end)
+    end)
+end
+
+local function ForcePart(v)
+    if v:IsA("BasePart") and not v.Anchored 
+    and not v.Parent:FindFirstChildOfClass("Humanoid") 
+    and v.Name ~= "Handle" and not v.Parent:IsA("Tool")
+    and not v:IsDescendantOf(LocalPlayer.Character) then
+        pcall(function()
+            v.CanCollide = false
+            if not table.find(getgenv().Network.BaseParts, v) then
+                table.insert(getgenv().Network.BaseParts, v)
+            end
+            local att = v:FindFirstChild("J_Att") or Instance.new("Attachment", v)
+            att.Name = "J_Att"
+            
+            local torque = v:FindFirstChild("J_Torque") or Instance.new("Torque", v)
+            torque.Name = "J_Torque"
+            torque.Attachment0 = att
+            torque.Torque = Vector3.new(1e10, 1e10, 1e10) 
+            
+            local align = v:FindFirstChild("J_Align") or Instance.new("AlignPosition", v)
+            align.Name = "J_Align"
+            align.Attachment0 = att; align.Attachment1 = Attachment1
+            align.MaxForce = math.huge
+            align.MaxVelocity = math.huge
+            align.Responsiveness = 500 
+        end)
+    end
+end
+
+local function Disable()
+    active = false
+    Button.Text = "ปิด"
+    Button.BackgroundColor3 = Color3.fromRGB(0, 0, 139)
+    if renderConn then renderConn:Disconnect(); renderConn = nil end
+end
+
+local function Enable()
+    if active then return end
+    active = true
+    Button.Text = "เปิด"
+    Button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    
+    task.spawn(function()
+        while active do
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                for _,v in ipairs(Workspace:GetDescendants()) do
+                    if v:IsA("BasePart") and not v.Anchored then
+                        ForcePart(v)
+                    end
+                end
+            end
+            task.wait(1.5)
+        end
+    end)
+
+    renderConn = RunService.RenderStepped:Connect(function()
+        if targetPlayer and targetPlayer.Character then
+            local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then targetPart = root end
+        end
+
+        if targetPart and targetPart.Parent then 
+            Attachment1.WorldPosition = targetPart.Position + Vector3.new(math.random(-1,1), 0, math.random(-1,1))
+        end
+    end)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Q then
+        if active then Disable() else Enable() end
+    end
+end)
+
+Button.MouseButton1Click:Connect(function()
+    if active then Disable() else Enable() end
+end)
+
+Box.FocusLost:Connect(function(enter)
+    if enter then
+        local found = false
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower():find(Box.Text:lower()) or p.DisplayName:lower():find(Box.Text:lower()) then
+                Box.Text = p.Name
+                targetPlayer = p 
+                targetPart = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                found = true
+                break
+            end
+        end
+        if not found then Box.Text = "" end
+    end
+end)
+
+EveryoneButton.MouseButton1Click:Connect(function()
+    if evActive then 
+        evActive = false
+        EveryoneButton.Text = "โจมตีทุกคน"
+        Disable()
+    else
+        evActive = true
+        EveryoneButton.Text = "โจมตีทุกคน | เปิด"
+        task.spawn(function()
+            while evActive do
+                for _,plr in ipairs(Players:GetPlayers()) do
+                    if not evActive then break end
+                    if plr ~= LocalPlayer and plr.Character then
+                        local root = plr.Character:FindFirstChild("HumanoidRootPart")
+                        if root then
+                            targetPlayer = plr 
+                            targetPart = root
+                            Enable()
+                            task.wait(1.2)
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") and char.Humanoid.Sit then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
