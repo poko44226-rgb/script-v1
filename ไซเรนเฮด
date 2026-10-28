@@ -1,0 +1,1358 @@
+local function RunMainScript()
+    
+    print("Dyton Security Passed: Script utama berhasil dijalankan!")
+
+-- [[ INDOMINUS REX CUSTOM CAMOUFLAGE CORE V11.0.0 + ABYSS RED DEEP HORROR ENGINE ]] --
+-- Engine Core: DYTON_txt (Eternatus Framework & Zero-Delay Bypass Engine)
+-- Developer: Josep Bart
+
+if _G.a then
+    for _, connection in pairs(_G.a) do
+        pcall(function() connection:Disconnect() end)
+    end
+    _G.a = nil
+end
+
+if game:GetService("Workspace"):FindFirstChild("AbyssAirWalkPlatform") then
+    game:GetService("Workspace"):FindFirstChild("AbyssAirWalkPlatform"):Destroy()
+end
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+
+
+local CoreGui = game:GetService("CoreGui")
+
+local OwnerName = LP.Name
+local petMode = false
+local noclip = false
+local IsInvisible = false 
+local isReloading = false
+local isMinimized = false
+local AirWalkActive = false
+local isBiting = false
+local isBitingState = 0
+local isSkilling = false
+local isSkillState = 0
+local isEmoting = false
+local isEmoteState = 0
+local camouflageActive = false 
+
+-- [[ CONFIGURATION MATRIX - INDEPENDENT OFFSETS ]] --
+local Config = {
+    Idle = {
+        Offset = Vector3.new(-22.2, -111.5, 360),
+        Rotation = Vector3.new(-3, 540.3, 0)
+    },
+    Walk = {
+        Offset = Vector3.new(-22.2, -109.5, 360),       
+        Rotation = Vector3.new(-3, 540.3, 0)    
+    },
+    Bite = {
+        Offset = Vector3.new(-22.2, -110.5, 360),
+        Rotation = Vector3.new(-3, 540, 0.3)
+    },
+    Skill = {
+        Offset = Vector3.new(-22.2, -108.5, 360),
+        Rotation = Vector3.new(-3, 540, 0.3)
+    },
+    Emote = {
+        Offset = Vector3.new(-22.2, -111.5, 360),
+        Rotation = Vector3.new(-3, 540, 0.3)
+    }
+}
+
+-- [[ OVERCLOCKED CACHE & ASYNC BYPASS BUFFERS ]] --
+local PROP_CACHE = {}          
+local CURRENT_CFRAMES = {}     
+local TARGET_CFRAMES = {}      
+local LAST_SEND_TIME = {}      
+local COLOR_SENDING = {}       
+local NETWORK_STATE = {}        
+local LAST_SCALE_CACHE = {}
+local SCALE_SENDING = {}
+local TEXTURE_APPLIED = {}      
+local PROP_COLOR_CACHE = {}
+
+local lastColorUpdate = 0
+local colorIndex = 1
+local originalPos = nil
+local snapNextFrame = false
+local TOTAL_MAX_PROPS = 40     
+
+-- [[ NETWORK BYPASS TUNING ]] --
+local BASE_TICK_RATE = 0.033 
+local NETWORK_TICK_RATE = 0.033 
+local estimatedPing = 0.03   
+local lastPosition = Vector3.zero
+local MAX_CHOKE_TIMEOUT = 0.05  
+
+-- [[ AIR WALK CONFIGURATION ]] --
+local TargetHeight = 100 
+local CurrentGroundY = 0
+local SmoothHeight = 0 
+local LastValidYaw = 0
+
+-- Create Air Walk Platform
+local Platform = Instance.new("Part")
+Platform.Name = "AbyssAirWalkPlatform"
+Platform.Size = Vector3.new(25, 1, 25)
+Platform.Transparency = 1 
+Platform.Anchored = true
+Platform.CanCollide = false
+Platform.Parent = game:GetService("Workspace")
+
+-- [[ ENHANCED FLEXIBLE MULTI-DIRECTIONAL CAMOUFLAGE SCANNER ]] --
+local function GetPropScannedColor(id, prop)
+    if not camouflageActive then
+        if id == 16 or id == 17 then
+            return Color3.fromRGB(0, 0, 0)
+        elseif id >= 18 and id <= 22 then
+            return Color3.fromRGB(255, 255, 255)
+        else
+            return Color3.fromRGB(130, 0, 0)
+        end
+    end
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local exclude = {LP.Character, Platform}
+    for _, p in pairs(PROP_CACHE) do 
+        if p and p.Parent then table.insert(exclude, p) end 
+    end
+    rayParams.FilterDescendantsInstances = exclude
+
+    local startPos
+    if prop and prop:IsA("BasePart") then
+        startPos = prop.Position
+    elseif CURRENT_CFRAMES[id] then
+        startPos = CURRENT_CFRAMES[id].Position
+    end
+
+    if not startPos then
+        local char = LP.Character
+        if char then
+            local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart")
+            if torso then startPos = torso.Position end
+        end
+    end
+
+    if startPos then
+        local scanDirections = {
+            Vector3.new(0, -100, 0),
+            Vector3.new(0, -100, 100),
+            Vector3.new(0, -100, -100),
+            Vector3.new(100, -100, 0),
+            Vector3.new(-100, -100, 0),
+            Vector3.new(0, 0, -200)
+        }
+
+        for _, dir in ipairs(scanDirections) do
+            local rayHit = workspace:Raycast(startPos, dir, rayParams)
+            if rayHit and rayHit.Instance and rayHit.Instance.CanCollide then
+                PROP_COLOR_CACHE[id] = rayHit.Instance.Color
+                return rayHit.Instance.Color
+            end
+        end
+    end
+
+    return PROP_COLOR_CACHE[id] or Color3.fromRGB(45, 80, 35)
+end
+
+-- [[ SINGLE EXECUTION TEXTURE SYSTEM (EXCLUDE PROP 1 & 2) ]] --
+local function ApplyPropTextureOnce(id, prop)
+    if id == 1 or id == 2 then return end
+    if TEXTURE_APPLIED[id] then return end
+    
+    TEXTURE_APPLIED[id] = true
+    task.spawn(function()
+        local textureRemote = prop:FindFirstChild("ApplyTexture")
+        if textureRemote and textureRemote:IsA("RemoteFunction") then
+            pcall(function()
+                textureRemote:InvokeServer("BrickGray")
+            end)
+        end
+    end)
+end
+
+local function UpdateAndValidateRodanProps()
+    local targetFolder = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_TrafficCones")
+    if not targetFolder then return false end
+
+    local targetPropName = "Prop" .. OwnerName 
+    if OwnerName == "terasiremik" then targetPropName = "Propterasiremik" end
+
+    for id, storedProp in pairs(PROP_CACHE) do
+        if not storedProp or not storedProp.Parent then 
+            PROP_CACHE[id] = nil
+            CURRENT_CFRAMES[id] = nil 
+            TARGET_CFRAMES[id] = nil
+            LAST_SEND_TIME[id] = nil
+            COLOR_SENDING[id] = nil
+            NETWORK_STATE[id] = nil
+            LAST_SCALE_CACHE[id] = nil
+            SCALE_SENDING[id] = nil
+            TEXTURE_APPLIED[id] = nil
+            PROP_COLOR_CACHE[id] = nil
+        end
+    end
+
+    local children = targetFolder:GetChildren()
+    table.sort(children, function(a, b) return a:GetDebugId() < b:GetDebugId() end)
+
+    for _, child in ipairs(children) do 
+        if child.Name == targetPropName then
+            local alreadyRegistered = false
+            for _, storedProp in pairs(PROP_CACHE) do
+                if storedProp == child then alreadyRegistered = true break end
+            end
+            
+            if not alreadyRegistered then
+                for id = 1, TOTAL_MAX_PROPS do
+                    if not PROP_CACHE[id] then
+                        PROP_CACHE[id] = child
+                        CURRENT_CFRAMES[id] = nil 
+                        TARGET_CFRAMES[id] = nil
+                        LAST_SEND_TIME[id] = 0
+                        COLOR_SENDING[id] = false
+                        NETWORK_STATE[id] = false
+                        LAST_SCALE_CACHE[id] = nil
+                        SCALE_SENDING[id] = false
+                        TEXTURE_APPLIED[id] = nil
+                        
+                        ApplyPropTextureOnce(id, child)
+                        break
+                    end
+                end
+            end
+        end
+    end
+    return true
+end
+
+local function UpdateGroundY()
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local exclusionList = {char, Platform}
+    for _, propPart in pairs(PROP_CACHE) do
+        if propPart and propPart.Parent then
+            table.insert(exclusionList, propPart)
+        end
+    end
+    raycastParams.FilterDescendantsInstances = exclusionList
+    
+    local startPosition = Vector3.new(root.Position.X, root.Position.Y + 50, root.Position.Z)
+    local raycastResult = game:GetService("Workspace"):Raycast(startPosition, Vector3.new(0, -2000, 0), raycastParams)
+    
+    if raycastResult then
+        CurrentGroundY = raycastResult.Position.Y
+    end
+end
+
+local function getBombCount()
+    local count = 0
+    local bp = LP:FindFirstChild("Backpack")
+    local char = LP.Character
+    if bp then for _, item in pairs(bp:GetChildren()) do if item.Name == "Bomb" then count = count + 1 end end end
+    if char then for _, item in pairs(char:GetChildren()) do if item.Name == "Bomb" then count = count + 1 end end end
+    return count
+end
+
+-- [[ ASSET MATRIX POOL CORE ]] --
+local AnimationPool = {
+    Idle = {
+        [1]  = { CFrame = CFrame.new(-38.516, 57.827, 361.625) * CFrame.Angles(math.rad(177.14), math.rad(-15.81), math.rad(-91.63)), Scale = 0.8090 },
+        [2]  = { CFrame = CFrame.new(-11.169, 56.888, 364.421) * CFrame.Angles(math.rad(177.30), math.rad(21.86), math.rad(94.66)), Scale = 0.8090 },
+        [3]  = { CFrame = CFrame.new(-23.835, 102.927, 357.791) * CFrame.Angles(math.rad(-152.48), math.rad(74.32), math.rad(161.61)), Scale = 2.1637 },
+        [4]  = { CFrame = CFrame.new(-24.527, 102.901, 357.833) * CFrame.Angles(math.rad(34.56), math.rad(76.40), math.rad(-25.60)), Scale = 2.1637 },
+        [5]  = { CFrame = CFrame.new(-29.251, 148.841, 362.812) * CFrame.Angles(math.rad(-127.70), math.rad(19.76), math.rad(-110.83)), Scale = 2.5000 },
+        [6]  = { CFrame = CFrame.new(-19.482, 143.836, 369.690) * CFrame.Angles(math.rad(-48.50), math.rad(-29.24), math.rad(55.78)), Scale = 2.5000 },
+        [7]  = { CFrame = CFrame.new(-23.906, 127.162, 362.397) * CFrame.Angles(math.rad(-170.50), math.rad(41.81), math.rad(-179.93)), Scale = 1.5776 },
+        [8]  = { CFrame = CFrame.new(-28.932, 67.589, 362.407) * CFrame.Angles(math.rad(176.64), math.rad(-46.18), math.rad(-176.28)), Scale = 2.5000 },
+        [9]  = { CFrame = CFrame.new(-18.968, 67.414, 362.919) * CFrame.Angles(math.rad(175.80), math.rad(49.16), math.rad(175.78)), Scale = 2.5000 },
+        [10] = { CFrame = CFrame.new(-30.571, 30.606, 358.974) * CFrame.Angles(math.rad(-177.33), math.rad(45.68), math.rad(-176.37)), Scale = 2.5000 },
+        [11] = { CFrame = CFrame.new(-16.923, 30.519, 359.561) * CFrame.Angles(math.rad(1.94), math.rad(47.66), math.rad(4.45)), Scale = 2.5000 },
+        [12] = { CFrame = CFrame.new(-29.705, 134.904, 363.033) * CFrame.Angles(math.rad(-95.35), math.rad(-81.92), math.rad(83.48)), Scale = 2.5000 },
+        [13] = { CFrame = CFrame.new(-35.020, 97.978, 362.212) * CFrame.Angles(math.rad(-102.96), math.rad(-86.22), math.rad(75.90)), Scale = 2.5000 },
+        [14] = { CFrame = CFrame.new(-17.960, 134.617, 363.244) * CFrame.Angles(math.rad(114.15), math.rad(-81.54), math.rad(-65.00)), Scale = 2.5000 },
+        [15] = { CFrame = CFrame.new(-12.965, 97.630, 363.888) * CFrame.Angles(math.rad(159.52), math.rad(-86.22), math.rad(-19.82)), Scale = 2.5000 },
+        [16] = { CFrame = CFrame.new(-25.313, 139.659, 364.237) * CFrame.Angles(math.rad(-81.99), math.rad(11.83), math.rad(179.81)), Scale = 1.0000 },
+        [17] = { CFrame = CFrame.new(-22.095, 139.622, 364.439) * CFrame.Angles(math.rad(105.30), math.rad(13.43), math.rad(177.42)), Scale = 1.0000 },
+        [18] = { CFrame = CFrame.new(-23.494, 125.491, 370.488) * CFrame.Angles(math.rad(-43.98), math.rad(2.02), math.rad(1.66)), Scale = 0.9339 },
+        [19] = { CFrame = CFrame.new(-23.461, 121.784, 369.732) * CFrame.Angles(math.rad(-43.98), math.rad(2.02), math.rad(1.66)), Scale = 1.2510 },
+        [20] = { CFrame = CFrame.new(-23.493, 118.290, 367.879) * CFrame.Angles(math.rad(-43.98), math.rad(2.02), math.rad(1.66)), Scale = 0.9435 },
+        [21] = { CFrame = CFrame.new(-23.854, 114.874, 366.606) * CFrame.Angles(math.rad(-43.98), math.rad(2.02), math.rad(1.66)), Scale = 0.6841 },
+        [22] = { CFrame = CFrame.new(-23.822, 111.079, 365.620) * CFrame.Angles(math.rad(-43.98), math.rad(2.02), math.rad(1.66)), Scale = 0.5016 },
+        [23] = { CFrame = CFrame.new(-35.444, 51.490, 363.219) * CFrame.Angles(math.rad(-104.14), math.rad(-9.90), math.rad(111.43)), Scale = 0.7418 },
+        [24] = { CFrame = CFrame.new(-35.617, 50.366, 361.233) * CFrame.Angles(math.rad(-89.44), math.rad(-3.87), math.rad(113.21)), Scale = 0.9435 },
+        [25] = { CFrame = CFrame.new(-36.413, 51.461, 360.075) * CFrame.Angles(math.rad(-85.94), math.rad(-2.37), math.rad(113.39)), Scale = 0.7418 },
+        [26] = { CFrame = CFrame.new(-36.896, 52.457, 359.276) * CFrame.Angles(math.rad(-82.24), math.rad(-0.77), math.rad(113.49)), Scale = 0.6457 },
+        [27] = { CFrame = CFrame.new(-14.300, 51.241, 365.379) * CFrame.Angles(math.rad(81.15), math.rad(-8.91), math.rad(-70.71)), Scale = 0.7418 },
+        [28] = { CFrame = CFrame.new(-14.217, 50.114, 363.764) * CFrame.Angles(math.rad(90.36), math.rad(-3.07), math.rad(-71.24)), Scale = 0.9435 },
+        [29] = { CFrame = CFrame.new(-13.314, 51.269, 362.827) * CFrame.Angles(math.rad(92.99), math.rad(-4.62), math.rad(-69.31)), Scale = 0.7418 },
+        [30] = { CFrame = CFrame.new(-12.597, 51.852, 361.952) * CFrame.Angles(math.rad(102.85), math.rad(-1.59), math.rad(-71.32)), Scale = 0.6457 },
+        [31] = { CFrame = CFrame.new(-34.659, 29.726, 371.077) * CFrame.Angles(math.rad(-177.75), math.rad(15.21), math.rad(179.47)), Scale = 0.7033 },
+        [32] = { CFrame = CFrame.new(-33.112, 29.726, 372.086) * CFrame.Angles(math.rad(-177.83), math.rad(5.96), math.rad(179.48)), Scale = 0.7033 },
+        [33] = { CFrame = CFrame.new(-31.155, 29.344, 372.314) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+        [34] = { CFrame = CFrame.new(-29.308, 29.726, 370.865) * CFrame.Angles(math.rad(-177.99), math.rad(-12.03), math.rad(179.48)), Scale = 0.7033 },
+        [35] = { CFrame = CFrame.new(-19.403, 29.726, 371.408) * CFrame.Angles(math.rad(-177.76), math.rad(13.65), math.rad(179.47)), Scale = 0.7033 },
+        [36] = { CFrame = CFrame.new(-17.775, 29.344, 372.768) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+        [37] = { CFrame = CFrame.new(-15.975, 29.726, 372.134) * CFrame.Angles(math.rad(-177.87), math.rad(1.57), math.rad(179.49)), Scale = 0.7033 },
+        [38] = { CFrame = CFrame.new(-14.080, 29.726, 371.691) * CFrame.Angles(math.rad(-177.94), math.rad(-6.35), math.rad(179.48)), Scale = 0.7033 },
+        [39] = { CFrame = CFrame.new(-31.694, 31.534, 364.187) * CFrame.Angles(math.rad(179.30), math.rad(2.93), math.rad(0.04)), Scale = 0.7610 },
+        [40] = { CFrame = CFrame.new(-16.352, 30.988, 364.533) * CFrame.Angles(math.rad(-180.00), math.rad(2.93), math.rad(-180.00)), Scale = 0.7610 }
+    },
+    Walk1 = {
+    [1] = { CFrame = CFrame.new(-40.407, 66.825, 364.849) * CFrame.Angles(math.rad(161.19), math.rad(-68.48), math.rad(-59.12)), Scale = 0.8090 },
+    [2] = { CFrame = CFrame.new(-2.869, 74.649, 408.138) * CFrame.Angles(math.rad(143.84), math.rad(63.04), math.rad(88.50)), Scale = 0.8090 },
+    [3] = { CFrame = CFrame.new(-24.089, 103.084, 357.287) * CFrame.Angles(math.rad(-162.85), math.rad(60.11), math.rad(177.83)), Scale = 2.1637 },
+    [4] = { CFrame = CFrame.new(-24.746, 103.053, 357.508) * CFrame.Angles(math.rad(119.60), math.rad(80.34), math.rad(-107.07)), Scale = 2.1637 },
+    [5] = { CFrame = CFrame.new(-27.113, 148.417, 367.210) * CFrame.Angles(math.rad(-126.43), math.rad(10.80), math.rad(-97.81)), Scale = 2.5000 },
+    [6] = { CFrame = CFrame.new(-15.967, 142.895, 370.823) * CFrame.Angles(math.rad(-39.26), math.rad(-17.78), math.rad(67.05)), Scale = 2.5000 },
+    [7] = { CFrame = CFrame.new(-22.480, 126.860, 363.662) * CFrame.Angles(math.rad(-168.06), math.rad(26.75), math.rad(-175.93)), Scale = 1.5776 },
+    [8] = { CFrame = CFrame.new(-25.684, 76.504, 383.519) * CFrame.Angles(math.rad(135.13), math.rad(-46.37), math.rad(176.43)), Scale = 2.5000 },
+    [9] = { CFrame = CFrame.new(-19.093, 67.208, 353.693) * CFrame.Angles(math.rad(-170.68), math.rad(45.01), math.rad(176.46)), Scale = 2.5000 },
+    [10] = { CFrame = CFrame.new(-25.597, 40.724, 374.744) * CFrame.Angles(math.rad(-166.62), math.rad(42.47), math.rad(179.76)), Scale = 2.5000 },
+    [11] = { CFrame = CFrame.new(-17.800, 32.235, 341.368) * CFrame.Angles(math.rad(17.11), math.rad(51.72), math.rad(2.95)), Scale = 2.5000 },
+    [12] = { CFrame = CFrame.new(-27.575, 134.655, 367.180) * CFrame.Angles(math.rad(-16.93), math.rad(-66.87), math.rad(131.53)), Scale = 2.5000 },
+    [13] = { CFrame = CFrame.new(-38.636, 103.612, 350.005) * CFrame.Angles(math.rad(-22.83), math.rad(-72.06), math.rad(175.32)), Scale = 2.5000 },
+    [14] = { CFrame = CFrame.new(-16.524, 134.151, 362.857) * CFrame.Angles(math.rad(15.49), math.rad(-69.40), math.rad(-141.73)), Scale = 2.5000 },
+    [15] = { CFrame = CFrame.new(-8.346, 99.653, 376.030) * CFrame.Angles(math.rad(-20.27), math.rad(-75.10), math.rad(-147.65)), Scale = 2.5000 },
+    [16] = { CFrame = CFrame.new(-23.112, 139.161, 366.800) * CFrame.Angles(math.rad(-80.86), math.rad(14.59), math.rad(-164.61)), Scale = 1.0000 },
+    [17] = { CFrame = CFrame.new(-19.957, 139.118, 366.136) * CFrame.Angles(math.rad(112.75), math.rad(7.94), math.rad(162.76)), Scale = 1.0000 },
+    [18] = { CFrame = CFrame.new(-19.970, 124.534, 371.193) * CFrame.Angles(math.rad(-40.66), math.rad(13.75), math.rad(11.77)), Scale = 0.9339 },
+    [19] = { CFrame = CFrame.new(-20.208, 120.902, 370.162) * CFrame.Angles(math.rad(-40.66), math.rad(13.75), math.rad(11.77)), Scale = 1.2510 },
+    [20] = { CFrame = CFrame.new(-20.795, 117.571, 368.113) * CFrame.Angles(math.rad(-40.66), math.rad(13.75), math.rad(11.77)), Scale = 0.9435 },
+    [21] = { CFrame = CFrame.new(-21.546, 114.270, 366.712) * CFrame.Angles(math.rad(-40.66), math.rad(13.75), math.rad(11.77)), Scale = 0.6841 },
+    [22] = { CFrame = CFrame.new(-21.848, 110.568, 365.454) * CFrame.Angles(math.rad(-40.66), math.rad(13.75), math.rad(11.77)), Scale = 0.5016 },
+    [23] = { CFrame = CFrame.new(-38.942, 61.001, 368.856) * CFrame.Angles(math.rad(-137.52), math.rad(-3.48), math.rad(168.06)), Scale = 0.7418 },
+    [24] = { CFrame = CFrame.new(-40.893, 59.814, 368.699) * CFrame.Angles(math.rad(-134.23), math.rad(11.96), math.rad(167.82)), Scale = 0.9435 },
+    [25] = { CFrame = CFrame.new(-41.998, 60.751, 367.663) * CFrame.Angles(math.rad(-133.39), math.rad(15.68), math.rad(167.61)), Scale = 0.7418 },
+    [26] = { CFrame = CFrame.new(-42.667, 61.508, 366.745) * CFrame.Angles(math.rad(-132.47), math.rad(19.61), math.rad(167.31)), Scale = 0.6457 },
+    [27] = { CFrame = CFrame.new(-5.685, 68.786, 409.740) * CFrame.Angles(math.rad(69.48), math.rad(-17.75), math.rad(-24.41)), Scale = 0.7418 },
+    [28] = { CFrame = CFrame.new(-5.167, 67.254, 408.984) * CFrame.Angles(math.rad(76.38), math.rad(-11.02), math.rad(-28.42)), Scale = 0.9435 },
+    [29] = { CFrame = CFrame.new(-3.588, 68.242, 408.568) * CFrame.Angles(math.rad(82.73), math.rad(-11.37), math.rad(-26.59)), Scale = 0.7418 },
+    [30] = { CFrame = CFrame.new(-2.974, 69.031, 407.804) * CFrame.Angles(math.rad(93.49), math.rad(-9.28), math.rad(-32.61)), Scale = 0.6457 },
+    [31] = { CFrame = CFrame.new(-28.655, 31.520, 382.480) * CFrame.Angles(math.rad(-111.88), math.rad(8.06), math.rad(172.84)), Scale = 0.7033 },
+    [32] = { CFrame = CFrame.new(-27.133, 31.417, 383.286) * CFrame.Angles(math.rad(-122.12), math.rad(0.28), math.rad(176.87)), Scale = 0.7033 },
+    [33] = { CFrame = CFrame.new(-25.417, 30.525, 383.418) * CFrame.Angles(math.rad(-122.38), math.rad(-2.77), math.rad(177.73)), Scale = 0.8571 },
+    [34] = { CFrame = CFrame.new(-23.314, 31.681, 382.293) * CFrame.Angles(math.rad(-108.35), math.rad(-16.12), math.rad(-174.20)), Scale = 0.7033 },
+    [35] = { CFrame = CFrame.new(-19.478, 29.705, 353.313) * CFrame.Angles(math.rad(-169.75), math.rad(9.85), math.rad(-179.93)), Scale = 0.7033 },
+    [36] = { CFrame = CFrame.new(-17.766, 29.138, 354.494) * CFrame.Angles(math.rad(-169.73), math.rad(-1.01), math.rad(-179.93)), Scale = 0.8571 },
+    [37] = { CFrame = CFrame.new(-16.010, 29.609, 353.801) * CFrame.Angles(math.rad(-169.73), math.rad(-2.23), math.rad(-179.93)), Scale = 0.7033 },
+    [38] = { CFrame = CFrame.new(-14.148, 29.675, 353.237) * CFrame.Angles(math.rad(-169.72), math.rad(-10.15), math.rad(-179.94)), Scale = 0.7033 },
+    [39] = { CFrame = CFrame.new(-26.359, 38.754, 378.672) * CFrame.Angles(math.rad(-140.98), math.rad(-1.78), math.rad(-2.63)), Scale = 0.7610 },
+    [40] = { CFrame = CFrame.new(-16.883, 31.933, 346.497) * CFrame.Angles(math.rad(-171.87), math.rad(-0.89), math.rad(-179.57)), Scale = 0.7610 },
+    },
+    Walk1combo = {
+    [1] = { CFrame = CFrame.new(-44.283, 63.557, 361.687) * CFrame.Angles(math.rad(-165.28), math.rad(-69.58), math.rad(-47.14)), Scale = 0.8090 },
+    [2] = { CFrame = CFrame.new(-4.594, 78.747, 428.357) * CFrame.Angles(math.rad(126.50), math.rad(65.16), math.rad(91.65)), Scale = 0.8090 },
+    [3] = { CFrame = CFrame.new(-24.584, 99.362, 372.265) * CFrame.Angles(math.rad(-159.69), math.rad(59.91), math.rad(177.54)), Scale = 2.1637 },
+    [4] = { CFrame = CFrame.new(-25.240, 99.317, 372.486) * CFrame.Angles(math.rad(123.89), math.rad(80.44), math.rad(-108.46)), Scale = 2.1637 },
+    [5] = { CFrame = CFrame.new(-27.739, 144.121, 384.484) * CFrame.Angles(math.rad(-123.52), math.rad(10.55), math.rad(-97.81)), Scale = 2.5000 },
+    [6] = { CFrame = CFrame.new(-16.564, 138.464, 387.785) * CFrame.Angles(math.rad(-36.27), math.rad(-17.79), math.rad(67.31)), Scale = 2.5000 },
+    [7] = { CFrame = CFrame.new(-23.040, 122.789, 379.835) * CFrame.Angles(math.rad(-165.07), math.rad(26.56), math.rad(-176.11)), Scale = 1.5776 },
+    [8] = { CFrame = CFrame.new(-26.885, 67.626, 391.201) * CFrame.Angles(math.rad(150.37), math.rad(-46.00), math.rad(178.07)), Scale = 2.5000 },
+    [9] = { CFrame = CFrame.new(-19.473, 63.733, 366.843) * CFrame.Angles(math.rad(-167.60), math.rad(44.83), math.rad(176.22)), Scale = 2.5000 },
+    [10] = { CFrame = CFrame.new(-26.735, 30.676, 392.273) * CFrame.Angles(math.rad(178.36), math.rad(49.08), math.rad(179.74)), Scale = 2.5000 },
+    [11] = { CFrame = CFrame.new(-18.750, 41.934, 337.106) * CFrame.Angles(math.rad(51.40), math.rad(55.81), math.rad(1.85)), Scale = 2.5000 },
+    [12] = { CFrame = CFrame.new(-28.121, 130.239, 383.940) * CFrame.Angles(math.rad(-6.51), math.rad(-65.56), math.rad(131.68)), Scale = 2.5000 },
+    [13] = { CFrame = CFrame.new(-39.705, 103.000, 361.843) * CFrame.Angles(math.rad(-11.67), math.rad(-69.87), math.rad(163.51)), Scale = 2.5000 },
+    [14] = { CFrame = CFrame.new(-17.112, 130.134, 379.386) * CFrame.Angles(math.rad(18.79), math.rad(-69.20), math.rad(-141.30)), Scale = 2.5000 },
+    [15] = { CFrame = CFrame.new(-8.748, 94.838, 390.808) * CFrame.Angles(math.rad(-37.82), math.rad(-77.52), math.rad(-150.78)), Scale = 2.5000 },
+    [16] = { CFrame = CFrame.new(-23.707, 134.913, 383.595) * CFrame.Angles(math.rad(-78.00), math.rad(14.42), math.rad(-164.42)), Scale = 1.0000 },
+    [17] = { CFrame = CFrame.new(-20.554, 134.916, 382.923) * CFrame.Angles(math.rad(115.70), math.rad(8.06), math.rad(162.54)), Scale = 1.0000 },
+    [18] = { CFrame = CFrame.new(-20.502, 120.092, 387.232) * CFrame.Angles(math.rad(-37.81), math.rad(13.73), math.rad(12.03)), Scale = 0.9339 },
+    [19] = { CFrame = CFrame.new(-20.731, 116.517, 386.019) * CFrame.Angles(math.rad(-37.81), math.rad(13.73), math.rad(12.03)), Scale = 1.2510 },
+    [20] = { CFrame = CFrame.new(-21.312, 113.292, 383.804) * CFrame.Angles(math.rad(-37.81), math.rad(13.73), math.rad(12.03)), Scale = 0.9435 },
+    [21] = { CFrame = CFrame.new(-22.054, 110.063, 382.240) * CFrame.Angles(math.rad(-37.81), math.rad(13.73), math.rad(12.03)), Scale = 0.6841 },
+    [22] = { CFrame = CFrame.new(-22.347, 106.430, 380.797) * CFrame.Angles(math.rad(-37.81), math.rad(13.73), math.rad(12.03)), Scale = 0.5016 },
+    [23] = { CFrame = CFrame.new(-43.265, 56.558, 363.141) * CFrame.Angles(math.rad(-115.06), math.rad(-0.55), math.rad(171.37)), Scale = 0.7418 },
+    [24] = { CFrame = CFrame.new(-45.302, 55.661, 362.607) * CFrame.Angles(math.rad(-112.64), math.rad(15.05), math.rad(171.07)), Scale = 0.9435 },
+    [25] = { CFrame = CFrame.new(-46.333, 56.998, 362.037) * CFrame.Angles(math.rad(-112.03), math.rad(18.82), math.rad(170.88)), Scale = 0.7418 },
+    [26] = { CFrame = CFrame.new(-46.942, 58.091, 361.495) * CFrame.Angles(math.rad(-111.32), math.rad(22.78), math.rad(170.61)), Scale = 0.6457 },
+    [27] = { CFrame = CFrame.new(-7.456, 73.431, 431.259) * CFrame.Angles(math.rad(55.76), math.rad(-18.41), math.rad(-21.85)), Scale = 0.7418 },
+    [28] = { CFrame = CFrame.new(-6.901, 71.767, 430.933) * CFrame.Angles(math.rad(62.36), math.rad(-11.40), math.rad(-25.87)), Scale = 0.9435 },
+    [29] = { CFrame = CFrame.new(-5.308, 72.643, 430.349) * CFrame.Angles(math.rad(68.73), math.rad(-11.47), math.rad(-24.02)), Scale = 0.7418 },
+    [30] = { CFrame = CFrame.new(-4.664, 73.224, 429.438) * CFrame.Angles(math.rad(79.38), math.rad(-8.91), math.rad(-30.08)), Scale = 0.6457 },
+    [31] = { CFrame = CFrame.new(-30.757, 29.170, 404.263) * CFrame.Angles(math.rad(175.49), math.rad(14.12), math.rad(178.11)), Scale = 0.7033 },
+    [32] = { CFrame = CFrame.new(-29.013, 29.565, 404.679) * CFrame.Angles(math.rad(171.97), math.rad(5.17), math.rad(177.04)), Scale = 0.7033 },
+    [33] = { CFrame = CFrame.new(-27.329, 29.111, 405.421) * CFrame.Angles(math.rad(170.57), math.rad(2.15), math.rad(176.44)), Scale = 0.8571 },
+    [34] = { CFrame = CFrame.new(-25.136, 29.670, 403.925) * CFrame.Angles(math.rad(170.13), math.rad(-12.31), math.rad(173.10)), Scale = 0.7033 },
+    [35] = { CFrame = CFrame.new(-19.542, 33.187, 345.752) * CFrame.Angles(math.rad(-136.36), math.rad(5.71), math.rad(-179.81)), Scale = 0.7033 },
+    [36] = { CFrame = CFrame.new(-17.744, 32.148, 346.331) * CFrame.Angles(math.rad(-136.32), math.rad(-5.15), math.rad(-179.81)), Scale = 0.8571 },
+    [37] = { CFrame = CFrame.new(-16.047, 33.006, 345.919) * CFrame.Angles(math.rad(-136.32), math.rad(-6.38), math.rad(-179.81)), Scale = 0.7033 },
+    [38] = { CFrame = CFrame.new(-14.231, 33.462, 345.385) * CFrame.Angles(math.rad(-136.29), math.rad(-14.30), math.rad(-179.80)), Scale = 0.7033 },
+    [39] = { CFrame = CFrame.new(-27.806, 31.280, 396.679) * CFrame.Angles(math.rad(-179.06), math.rad(1.59), math.rad(-3.49)), Scale = 0.7610 },
+    [40] = { CFrame = CFrame.new(-17.465, 38.912, 341.163) * CFrame.Angles(math.rad(-138.47), math.rad(-5.03), math.rad(-179.59)), Scale = 0.7610 },
+    },
+    Walk2 = {
+    [1] = { CFrame = CFrame.new(-48.147, 71.047, 416.661) * CFrame.Angles(math.rad(136.32), math.rad(-52.08), math.rad(-46.32)), Scale = 0.8090 },
+    [2] = { CFrame = CFrame.new(-8.805, 60.967, 382.102) * CFrame.Angles(math.rad(96.27), math.rad(72.93), math.rad(121.67)), Scale = 0.8090 },
+    [3] = { CFrame = CFrame.new(-24.537, 99.646, 370.758) * CFrame.Angles(math.rad(-97.42), math.rad(77.09), math.rad(120.22)), Scale = 2.1637 },
+    [4] = { CFrame = CFrame.new(-25.222, 99.582, 370.669) * CFrame.Angles(math.rad(23.49), math.rad(69.49), math.rad(1.39)), Scale = 2.1637 },
+    [5] = { CFrame = CFrame.new(-34.513, 142.430, 386.009) * CFrame.Angles(math.rad(-109.01), math.rad(21.20), math.rad(-121.77)), Scale = 2.5000 },
+    [6] = { CFrame = CFrame.new(-25.575, 136.214, 393.027) * CFrame.Angles(math.rad(-36.30), math.rad(-38.84), math.rad(51.11)), Scale = 2.5000 },
+    [7] = { CFrame = CFrame.new(-27.370, 121.834, 381.158) * CFrame.Angles(math.rad(-148.70), math.rad(49.66), math.rad(170.38)), Scale = 1.5776 },
+    [8] = { CFrame = CFrame.new(-28.070, 65.209, 361.454) * CFrame.Angles(math.rad(-166.24), math.rad(-40.86), math.rad(179.79)), Scale = 2.5000 },
+    [9] = { CFrame = CFrame.new(-21.777, 73.598, 397.559) * CFrame.Angles(math.rad(134.12), math.rad(45.03), math.rad(-179.97)), Scale = 2.5000 },
+    [10] = { CFrame = CFrame.new(-26.756, 31.869, 345.128) * CFrame.Angles(math.rad(-151.09), math.rad(52.81), math.rad(176.87)), Scale = 2.5000 },
+    [11] = { CFrame = CFrame.new(-20.515, 40.154, 381.887) * CFrame.Angles(math.rad(22.76), math.rad(49.11), math.rad(3.03)), Scale = 2.5000 },
+    [12] = { CFrame = CFrame.new(-33.730, 129.188, 382.269) * CFrame.Angles(math.rad(-97.27), math.rad(-79.77), math.rad(85.82)), Scale = 2.5000 },
+    [13] = { CFrame = CFrame.new(-40.481, 92.699, 384.270) * CFrame.Angles(math.rad(-130.14), math.rad(-80.67), math.rad(102.73)), Scale = 2.5000 },
+    [14] = { CFrame = CFrame.new(-22.153, 128.957, 384.358) * CFrame.Angles(math.rad(109.18), math.rad(-69.83), math.rad(-98.90)), Scale = 2.5000 },
+    [15] = { CFrame = CFrame.new(-9.739, 98.125, 367.493) * CFrame.Angles(math.rad(24.58), math.rad(-87.56), math.rad(-138.65)), Scale = 2.5000 },
+    [16] = { CFrame = CFrame.new(-30.095, 133.362, 385.772) * CFrame.Angles(math.rad(-65.88), math.rad(5.66), math.rad(171.41)), Scale = 1.0000 },
+    [17] = { CFrame = CFrame.new(-26.959, 133.404, 386.519) * CFrame.Angles(math.rad(117.80), math.rad(20.36), math.rad(-174.55)), Scale = 1.0000 },
+    [18] = { CFrame = CFrame.new(-28.110, 118.141, 388.523) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.9339 },
+    [19] = { CFrame = CFrame.new(-27.647, 114.762, 386.887) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 1.2510 },
+    [20] = { CFrame = CFrame.new(-27.090, 111.869, 384.248) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.9435 },
+    [21] = { CFrame = CFrame.new(-26.957, 108.889, 382.122) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.6841 },
+    [22] = { CFrame = CFrame.new(-26.450, 105.483, 380.245) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.5016 },
+    [23] = { CFrame = CFrame.new(-48.189, 68.806, 423.524) * CFrame.Angles(math.rad(-172.97), math.rad(10.94), math.rad(158.09)), Scale = 0.7418 },
+    [24] = { CFrame = CFrame.new(-50.001, 67.479, 423.649) * CFrame.Angles(math.rad(-166.52), math.rad(25.51), math.rad(156.08)), Scale = 0.9435 },
+    [25] = { CFrame = CFrame.new(-50.759, 67.495, 421.943) * CFrame.Angles(math.rad(-164.77), math.rad(28.97), math.rad(155.25)), Scale = 0.7418 },
+    [26] = { CFrame = CFrame.new(-51.092, 67.493, 420.620) * CFrame.Angles(math.rad(-162.76), math.rad(32.59), math.rad(154.21)), Scale = 0.6457 },
+    [27] = { CFrame = CFrame.new(-11.482, 56.393, 387.059) * CFrame.Angles(math.rad(10.32), math.rad(-11.05), math.rad(-4.53)), Scale = 0.7418 },
+    [28] = { CFrame = CFrame.new(-10.103, 55.404, 387.607) * CFrame.Angles(math.rad(21.20), math.rad(-1.95), math.rad(-5.78)), Scale = 0.9435 },
+    [29] = { CFrame = CFrame.new(-8.716, 55.833, 387.342) * CFrame.Angles(math.rad(21.66), math.rad(5.19), math.rad(-25.08)), Scale = 0.7418 },
+    [30] = { CFrame = CFrame.new(-7.956, 55.634, 386.206) * CFrame.Angles(math.rad(23.25), math.rad(21.59), math.rad(-31.06)), Scale = 0.6457 },
+    [31] = { CFrame = CFrame.new(-31.967, 29.270, 356.739) * CFrame.Angles(math.rad(-164.85), math.rad(19.59), math.rad(173.51)), Scale = 0.7033 },
+    [32] = { CFrame = CFrame.new(-30.567, 29.455, 357.665) * CFrame.Angles(math.rad(-168.99), math.rad(10.73), math.rad(175.50)), Scale = 0.7033 },
+    [33] = { CFrame = CFrame.new(-28.916, 28.771, 358.731) * CFrame.Angles(math.rad(-165.33), math.rad(7.27), math.rad(175.25)), Scale = 0.8571 },
+    [34] = { CFrame = CFrame.new(-26.429, 29.716, 358.092) * CFrame.Angles(math.rad(-174.48), math.rad(-6.91), math.rad(176.25)), Scale = 0.7033 },
+    [35] = { CFrame = CFrame.new(-23.094, 31.471, 390.324) * CFrame.Angles(math.rad(-139.32), math.rad(14.72), math.rad(177.23)), Scale = 0.7033 },
+    [36] = { CFrame = CFrame.new(-21.481, 30.362, 391.227) * CFrame.Angles(math.rad(-139.84), math.rad(3.87), math.rad(177.33)), Scale = 0.8571 },
+    [37] = { CFrame = CFrame.new(-19.684, 31.083, 391.030) * CFrame.Angles(math.rad(-139.91), math.rad(2.65), math.rad(177.32)), Scale = 0.7033 },
+    [38] = { CFrame = CFrame.new(-17.782, 31.387, 390.754) * CFrame.Angles(math.rad(-140.27), math.rad(-5.27), math.rad(177.32)), Scale = 0.7033 },
+    [39] = { CFrame = CFrame.new(-28.318, 32.275, 349.908) * CFrame.Angles(math.rad(-176.08), math.rad(8.15), math.rad(-2.92)), Scale = 0.7610 },
+    [40] = { CFrame = CFrame.new(-19.954, 36.741, 385.794) * CFrame.Angles(math.rad(-141.98), math.rad(4.09), math.rad(177.87)), Scale = 0.7610 },
+    }, 
+    Walk2combo = {
+    [1] = { CFrame = CFrame.new(-48.308, 72.062, 416.257) * CFrame.Angles(math.rad(139.83), math.rad(-54.88), math.rad(-22.41)), Scale = 0.8090 },
+    [2] = { CFrame = CFrame.new(-4.295, 65.470, 362.839) * CFrame.Angles(math.rad(126.45), math.rad(76.16), math.rad(107.39)), Scale = 0.8090 },
+    [3] = { CFrame = CFrame.new(-24.537, 99.646, 370.758) * CFrame.Angles(math.rad(-97.42), math.rad(77.09), math.rad(120.22)), Scale = 2.1637 },
+    [4] = { CFrame = CFrame.new(-25.222, 99.582, 370.669) * CFrame.Angles(math.rad(23.49), math.rad(69.49), math.rad(1.39)), Scale = 2.1637 },
+    [5] = { CFrame = CFrame.new(-34.513, 142.430, 386.009) * CFrame.Angles(math.rad(-109.01), math.rad(21.20), math.rad(-121.77)), Scale = 2.5000 },
+    [6] = { CFrame = CFrame.new(-25.575, 136.214, 393.027) * CFrame.Angles(math.rad(-36.30), math.rad(-38.84), math.rad(51.11)), Scale = 2.5000 },
+    [7] = { CFrame = CFrame.new(-27.370, 121.834, 381.158) * CFrame.Angles(math.rad(-148.70), math.rad(49.66), math.rad(170.38)), Scale = 1.5776 },
+    [8] = { CFrame = CFrame.new(-28.070, 65.209, 361.454) * CFrame.Angles(math.rad(-166.24), math.rad(-40.86), math.rad(179.79)), Scale = 2.5000 },
+    [9] = { CFrame = CFrame.new(-20.373, 68.481, 390.451) * CFrame.Angles(math.rad(149.89), math.rad(44.39), math.rad(176.93)), Scale = 2.5000 },
+    [10] = { CFrame = CFrame.new(-26.756, 31.869, 345.128) * CFrame.Angles(math.rad(-151.09), math.rad(52.81), math.rad(176.87)), Scale = 2.5000 },
+    [11] = { CFrame = CFrame.new(-19.816, 31.163, 393.104) * CFrame.Angles(math.rad(-4.59), math.rad(44.73), math.rad(1.35)), Scale = 2.5000 },
+    [12] = { CFrame = CFrame.new(-33.730, 129.188, 382.269) * CFrame.Angles(math.rad(-97.27), math.rad(-79.77), math.rad(85.82)), Scale = 2.5000 },
+    [13] = { CFrame = CFrame.new(-40.481, 92.699, 384.270) * CFrame.Angles(math.rad(-130.14), math.rad(-80.67), math.rad(102.73)), Scale = 2.5000 },
+    [14] = { CFrame = CFrame.new(-22.210, 128.783, 384.664) * CFrame.Angles(math.rad(115.88), math.rad(-66.68), math.rad(-109.33)), Scale = 2.5000 },
+    [15] = { CFrame = CFrame.new(-8.567, 105.028, 359.391) * CFrame.Angles(math.rad(60.43), math.rad(-82.80), math.rad(-119.14)), Scale = 2.5000 },
+    [16] = { CFrame = CFrame.new(-30.095, 133.362, 385.772) * CFrame.Angles(math.rad(-65.88), math.rad(5.66), math.rad(171.41)), Scale = 1.0000 },
+    [17] = { CFrame = CFrame.new(-26.959, 133.404, 386.519) * CFrame.Angles(math.rad(117.80), math.rad(20.36), math.rad(-174.55)), Scale = 1.0000 },
+    [18] = { CFrame = CFrame.new(-28.110, 118.141, 388.523) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.9339 },
+    [19] = { CFrame = CFrame.new(-27.647, 114.762, 386.887) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 1.2510 },
+    [20] = { CFrame = CFrame.new(-27.090, 111.869, 384.248) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.9435 },
+    [21] = { CFrame = CFrame.new(-26.957, 108.889, 382.122) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.6841 },
+    [22] = { CFrame = CFrame.new(-26.450, 105.483, 380.245) * CFrame.Angles(math.rad(-29.30), math.rad(-7.92), math.rad(-1.23)), Scale = 0.5016 },
+    [23] = { CFrame = CFrame.new(-49.531, 71.898, 423.371) * CFrame.Angles(math.rad(167.97), math.rad(17.84), math.rad(171.18)), Scale = 0.7418 },
+    [24] = { CFrame = CFrame.new(-51.603, 71.038, 423.545) * CFrame.Angles(math.rad(170.82), math.rad(33.42), math.rad(169.95)), Scale = 0.9435 },
+    [25] = { CFrame = CFrame.new(-52.167, 70.719, 421.794) * CFrame.Angles(math.rad(171.64), math.rad(37.16), math.rad(169.46)), Scale = 0.7418 },
+    [26] = { CFrame = CFrame.new(-52.361, 70.409, 420.479) * CFrame.Angles(math.rad(172.64), math.rad(41.10), math.rad(168.81)), Scale = 0.6457 },
+    [27] = { CFrame = CFrame.new(-6.387, 59.489, 366.374) * CFrame.Angles(math.rad(27.27), math.rad(-7.40), math.rad(-1.11)), Scale = 0.7418 },
+    [28] = { CFrame = CFrame.new(-4.916, 58.501, 366.579) * CFrame.Angles(math.rad(37.59), math.rad(2.26), math.rad(-3.13)), Scale = 0.9435 },
+    [29] = { CFrame = CFrame.new(-3.578, 59.098, 366.405) * CFrame.Angles(math.rad(37.72), math.rad(9.41), math.rad(-22.43)), Scale = 0.7418 },
+    [30] = { CFrame = CFrame.new(-2.865, 59.288, 365.237) * CFrame.Angles(math.rad(38.53), math.rad(25.87), math.rad(-28.28)), Scale = 0.6457 },
+    [31] = { CFrame = CFrame.new(-31.967, 29.270, 356.739) * CFrame.Angles(math.rad(-164.85), math.rad(19.59), math.rad(173.51)), Scale = 0.7033 },
+    [32] = { CFrame = CFrame.new(-30.567, 29.455, 357.665) * CFrame.Angles(math.rad(-168.99), math.rad(10.73), math.rad(175.50)), Scale = 0.7033 },
+    [33] = { CFrame = CFrame.new(-28.916, 28.771, 358.731) * CFrame.Angles(math.rad(-165.33), math.rad(7.27), math.rad(175.25)), Scale = 0.8571 },
+    [34] = { CFrame = CFrame.new(-26.429, 29.716, 358.092) * CFrame.Angles(math.rad(-174.48), math.rad(-6.91), math.rad(176.25)), Scale = 0.7033 },
+    [35] = { CFrame = CFrame.new(-23.263, 29.151, 404.857) * CFrame.Angles(math.rad(-175.64), math.rad(18.79), math.rad(177.95)), Scale = 0.7033 },
+    [36] = { CFrame = CFrame.new(-21.757, 28.759, 406.349) * CFrame.Angles(math.rad(-176.02), math.rad(7.93), math.rad(178.04)), Scale = 0.8571 },
+    [37] = { CFrame = CFrame.new(-19.916, 29.194, 405.893) * CFrame.Angles(math.rad(-176.08), math.rad(6.72), math.rad(178.05)), Scale = 0.7033 },
+    [38] = { CFrame = CFrame.new(-17.989, 29.243, 405.625) * CFrame.Angles(math.rad(-176.34), math.rad(-1.21), math.rad(178.06)), Scale = 0.7033 },
+    [39] = { CFrame = CFrame.new(-28.318, 32.275, 349.908) * CFrame.Angles(math.rad(-176.08), math.rad(8.15), math.rad(-2.92)), Scale = 0.7610 },
+    [40] = { CFrame = CFrame.new(-19.630, 30.680, 398.329) * CFrame.Angles(math.rad(-178.19), math.rad(8.12), math.rad(178.76)), Scale = 0.7610 },
+    },
+    Bite1 = {
+    [1] = { CFrame = CFrame.new(-36.962, 33.126, 408.477) * CFrame.Angles(math.rad(89.66), math.rad(-74.80), math.rad(-105.63)), Scale = 0.8090 },
+    [2] = { CFrame = CFrame.new(-11.033, 33.058, 378.397) * CFrame.Angles(math.rad(-150.99), math.rad(79.28), math.rad(-23.01)), Scale = 0.8090 },
+    [3] = { CFrame = CFrame.new(-26.708, 88.813, 351.349) * CFrame.Angles(math.rad(-103.93), math.rad(73.30), math.rad(169.43)), Scale = 2.1637 },
+    [4] = { CFrame = CFrame.new(-27.398, 88.757, 351.378) * CFrame.Angles(math.rad(100.60), math.rad(76.79), math.rad(-35.86)), Scale = 2.1637 },
+    [5] = { CFrame = CFrame.new(-30.688, 110.232, 392.434) * CFrame.Angles(math.rad(-72.50), math.rad(19.89), math.rad(-108.27)), Scale = 2.5000 },
+    [6] = { CFrame = CFrame.new(-20.849, 101.838, 391.723) * CFrame.Angles(math.rad(7.72), math.rad(-26.85), math.rad(56.12)), Scale = 2.5000 },
+    [7] = { CFrame = CFrame.new(-25.962, 98.527, 374.012) * CFrame.Angles(math.rad(-116.05), math.rad(40.25), math.rad(-177.48)), Scale = 1.5776 },
+    [8] = { CFrame = CFrame.new(-32.057, 62.261, 379.052) * CFrame.Angles(math.rad(135.96), math.rad(-44.73), math.rad(-175.53)), Scale = 2.5000 },
+    [9] = { CFrame = CFrame.new(-22.110, 62.578, 379.797) * CFrame.Angles(math.rad(133.92), math.rad(50.60), math.rad(176.65)), Scale = 2.5000 },
+    [10] = { CFrame = CFrame.new(-30.153, 30.952, 358.581) * CFrame.Angles(math.rad(-145.66), math.rad(50.89), math.rad(176.00)), Scale = 2.5000 },
+    [11] = { CFrame = CFrame.new(-16.665, 31.000, 360.749) * CFrame.Angles(math.rad(23.41), math.rad(41.97), math.rad(10.82)), Scale = 2.5000 },
+    [12] = { CFrame = CFrame.new(-31.678, 101.894, 378.979) * CFrame.Angles(math.rad(-56.36), math.rad(-79.85), math.rad(133.71)), Scale = 2.5000 },
+    [13] = { CFrame = CFrame.new(-36.551, 65.363, 385.573) * CFrame.Angles(math.rad(-38.25), math.rad(-81.35), math.rad(173.65)), Scale = 2.5000 },
+    [14] = { CFrame = CFrame.new(-19.970, 101.861, 379.035) * CFrame.Angles(math.rad(58.27), math.rad(-75.21), math.rad(-144.37)), Scale = 2.5000 },
+    [15] = { CFrame = CFrame.new(-14.418, 67.778, 364.421) * CFrame.Angles(math.rad(0.44), math.rad(-75.86), math.rad(-163.68)), Scale = 2.5000 },
+    [16] = { CFrame = CFrame.new(-26.963, 103.966, 385.456) * CFrame.Angles(math.rad(-26.29), math.rad(13.64), math.rad(-178.57)), Scale = 1.0000 },
+    [17] = { CFrame = CFrame.new(-23.743, 103.812, 385.408) * CFrame.Angles(math.rad(161.64), math.rad(11.41), math.rad(176.07)), Scale = 1.0000 },
+    [18] = { CFrame = CFrame.new(-25.341, 90.887, 377.122) * CFrame.Angles(math.rad(12.08), math.rad(4.43), math.rad(1.78)), Scale = 0.9339 },
+    [19] = { CFrame = CFrame.new(-25.435, 89.445, 373.626) * CFrame.Angles(math.rad(12.08), math.rad(4.43), math.rad(1.78)), Scale = 1.2510 },
+    [20] = { CFrame = CFrame.new(-25.621, 89.030, 369.698) * CFrame.Angles(math.rad(12.08), math.rad(4.43), math.rad(1.78)), Scale = 0.9435 },
+    [21] = { CFrame = CFrame.new(-26.117, 88.174, 366.170) * CFrame.Angles(math.rad(12.08), math.rad(4.43), math.rad(1.78)), Scale = 0.6841 },
+    [22] = { CFrame = CFrame.new(-26.221, 86.873, 362.473) * CFrame.Angles(math.rad(12.08), math.rad(4.43), math.rad(1.78)), Scale = 0.5016 },
+    [23] = { CFrame = CFrame.new(-33.901, 29.763, 414.084) * CFrame.Angles(math.rad(-163.80), math.rad(-18.31), math.rad(172.40)), Scale = 0.7418 },
+    [24] = { CFrame = CFrame.new(-35.676, 28.638, 414.991) * CFrame.Angles(math.rad(-161.74), math.rad(-2.65), math.rad(172.77)), Scale = 0.9435 },
+    [25] = { CFrame = CFrame.new(-37.100, 29.002, 413.984) * CFrame.Angles(math.rad(-161.26), math.rad(1.12), math.rad(172.78)), Scale = 0.7418 },
+    [26] = { CFrame = CFrame.new(-38.053, 29.259, 413.042) * CFrame.Angles(math.rad(-160.74), math.rad(5.12), math.rad(172.76)), Scale = 0.6457 },
+    [27] = { CFrame = CFrame.new(-11.643, 30.167, 384.217) * CFrame.Angles(math.rad(7.68), math.rad(1.01), math.rad(2.32)), Scale = 0.7418 },
+    [28] = { CFrame = CFrame.new(-9.873, 29.751, 384.979) * CFrame.Angles(math.rad(4.83), math.rad(11.49), math.rad(1.13)), Scale = 0.9435 },
+    [29] = { CFrame = CFrame.new(-8.980, 30.382, 383.624) * CFrame.Angles(math.rad(7.16), math.rad(13.50), math.rad(2.38)), Scale = 0.7418 },
+    [30] = { CFrame = CFrame.new(-8.079, 30.836, 382.849) * CFrame.Angles(math.rad(7.47), math.rad(23.81), math.rad(-0.26)), Scale = 0.6457 },
+    [31] = { CFrame = CFrame.new(-34.400, 29.780, 372.032) * CFrame.Angles(math.rad(-177.75), math.rad(15.21), math.rad(179.47)), Scale = 0.7033 },
+    [32] = { CFrame = CFrame.new(-32.852, 29.780, 373.042) * CFrame.Angles(math.rad(-177.83), math.rad(5.96), math.rad(179.48)), Scale = 0.7033 },
+    [33] = { CFrame = CFrame.new(-30.896, 29.399, 373.270) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+    [34] = { CFrame = CFrame.new(-29.049, 29.780, 371.820) * CFrame.Angles(math.rad(-177.99), math.rad(-12.03), math.rad(179.48)), Scale = 0.7033 },
+    [35] = { CFrame = CFrame.new(-19.143, 29.780, 372.363) * CFrame.Angles(math.rad(-177.76), math.rad(13.65), math.rad(179.47)), Scale = 0.7033 },
+    [36] = { CFrame = CFrame.new(-17.515, 29.399, 373.724) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+    [37] = { CFrame = CFrame.new(-15.715, 29.780, 373.090) * CFrame.Angles(math.rad(-177.87), math.rad(1.56), math.rad(179.49)), Scale = 0.7033 },
+    [38] = { CFrame = CFrame.new(-13.820, 29.780, 372.647) * CFrame.Angles(math.rad(-177.94), math.rad(-6.35), math.rad(179.48)), Scale = 0.7033 },
+    [39] = { CFrame = CFrame.new(-31.434, 31.589, 365.142) * CFrame.Angles(math.rad(179.30), math.rad(2.93), math.rad(0.04)), Scale = 0.7610 },
+    [40] = { CFrame = CFrame.new(-16.092, 31.043, 365.489) * CFrame.Angles(math.rad(-180.00), math.rad(2.93), math.rad(-180.00)), Scale = 0.7610 },
+    }, 
+    Bite2 = {
+    [1] = { CFrame = CFrame.new(-17.442, 129.047, 376.442) * CFrame.Angles(math.rad(163.91), math.rad(4.65), math.rad(107.66)), Scale = 0.8090 },
+    [2] = { CFrame = CFrame.new(-24.913, 128.552, 375.706) * CFrame.Angles(math.rad(96.24), math.rad(-63.67), math.rad(-179.27)), Scale = 0.8090 },
+    [3] = { CFrame = CFrame.new(-23.346, 103.659, 345.295) * CFrame.Angles(math.rad(-125.51), math.rad(73.19), math.rad(164.46)), Scale = 2.1637 },
+    [4] = { CFrame = CFrame.new(-24.037, 103.610, 345.334) * CFrame.Angles(math.rad(68.54), math.rad(77.37), math.rad(-29.99)), Scale = 2.1637 },
+    [5] = { CFrame = CFrame.new(-28.468, 141.002, 372.534) * CFrame.Angles(math.rad(-98.41), math.rad(19.09), math.rad(-109.54)), Scale = 2.5000 },
+    [6] = { CFrame = CFrame.new(-18.556, 133.331, 375.804) * CFrame.Angles(math.rad(-18.31), math.rad(-28.17), math.rad(56.79)), Scale = 2.5000 },
+    [7] = { CFrame = CFrame.new(-23.216, 122.425, 361.307) * CFrame.Angles(math.rad(-141.17), math.rad(40.49), math.rad(-179.35)), Scale = 1.5776 },
+    [8] = { CFrame = CFrame.new(-28.430, 67.589, 350.098) * CFrame.Angles(math.rad(176.64), math.rad(-46.18), math.rad(-176.28)), Scale = 2.5000 },
+    [9] = { CFrame = CFrame.new(-18.466, 67.414, 350.610) * CFrame.Angles(math.rad(175.80), math.rad(49.16), math.rad(175.78)), Scale = 2.5000 },
+    [10] = { CFrame = CFrame.new(-30.069, 30.606, 346.665) * CFrame.Angles(math.rad(-177.33), math.rad(45.68), math.rad(-176.37)), Scale = 2.5000 },
+    [11] = { CFrame = CFrame.new(-16.421, 30.519, 347.252) * CFrame.Angles(math.rad(1.94), math.rad(47.66), math.rad(4.45)), Scale = 2.5000 },
+    [12] = { CFrame = CFrame.new(-28.907, 128.852, 364.876) * CFrame.Angles(math.rad(-82.60), math.rad(-74.25), math.rad(113.62)), Scale = 2.5000 },
+    [13] = { CFrame = CFrame.new(-37.909, 94.495, 375.984) * CFrame.Angles(math.rad(23.62), math.rad(32.00), math.rad(-36.36)), Scale = 2.5000 },
+    [14] = { CFrame = CFrame.new(-17.420, 128.793, 365.569) * CFrame.Angles(math.rad(97.09), math.rad(-70.77), math.rad(-80.37)), Scale = 2.5000 },
+    [15] = { CFrame = CFrame.new(-5.172, 93.717, 367.931) * CFrame.Angles(math.rad(-160.93), math.rad(14.07), math.rad(150.45)), Scale = 2.5000 },
+    [16] = { CFrame = CFrame.new(-24.532, 132.356, 369.131) * CFrame.Angles(math.rad(-52.56), math.rad(12.23), math.rad(-178.83)), Scale = 1.0000 },
+    [17] = { CFrame = CFrame.new(-21.310, 132.251, 369.216) * CFrame.Angles(math.rad(135.31), math.rad(12.86), math.rad(176.13)), Scale = 1.0000 },
+    [18] = { CFrame = CFrame.new(-22.618, 116.967, 367.494) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.9339 },
+    [19] = { CFrame = CFrame.new(-22.616, 114.123, 365.000) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 1.2510 },
+    [20] = { CFrame = CFrame.new(-22.705, 112.007, 361.661) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.9435 },
+    [21] = { CFrame = CFrame.new(-23.109, 109.668, 358.870) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.6841 },
+    [22] = { CFrame = CFrame.new(-23.115, 106.860, 356.133) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.5016 },
+    [23] = { CFrame = CFrame.new(-17.952, 136.249, 376.478) * CFrame.Angles(math.rad(88.59), math.rad(-11.13), math.rad(-75.03)), Scale = 0.7418 },
+    [24] = { CFrame = CFrame.new(-17.818, 136.745, 374.247) * CFrame.Angles(math.rad(72.83), math.rad(-14.75), math.rad(-78.60)), Scale = 0.9435 },
+    [25] = { CFrame = CFrame.new(-17.656, 135.201, 373.373) * CFrame.Angles(math.rad(68.95), math.rad(-15.49), math.rad(-79.61)), Scale = 0.7418 },
+    [26] = { CFrame = CFrame.new(-17.682, 133.943, 372.845) * CFrame.Angles(math.rad(64.84), math.rad(-16.15), math.rad(-80.74)), Scale = 0.6457 },
+    [27] = { CFrame = CFrame.new(-25.890, 134.809, 374.125) * CFrame.Angles(math.rad(-85.96), math.rad(-17.33), math.rad(177.38)), Scale = 0.7418 },
+    [28] = { CFrame = CFrame.new(-27.784, 135.130, 373.687) * CFrame.Angles(math.rad(-83.83), math.rad(-28.02), math.rad(176.72)), Scale = 0.9435 },
+    [29] = { CFrame = CFrame.new(-28.274, 133.478, 373.935) * CFrame.Angles(math.rad(-86.62), math.rad(-29.84), math.rad(177.12)), Scale = 0.7418 },
+    [30] = { CFrame = CFrame.new(-28.931, 132.406, 374.126) * CFrame.Angles(math.rad(-88.20), math.rad(-40.06), math.rad(173.67)), Scale = 0.6457 },
+    [31] = { CFrame = CFrame.new(-34.158, 29.726, 358.768) * CFrame.Angles(math.rad(-177.75), math.rad(15.21), math.rad(179.47)), Scale = 0.7033 },
+    [32] = { CFrame = CFrame.new(-32.611, 29.726, 359.777) * CFrame.Angles(math.rad(-177.83), math.rad(5.96), math.rad(179.48)), Scale = 0.7033 },
+    [33] = { CFrame = CFrame.new(-30.654, 29.344, 360.005) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+    [34] = { CFrame = CFrame.new(-28.807, 29.726, 358.556) * CFrame.Angles(math.rad(-177.99), math.rad(-12.03), math.rad(179.48)), Scale = 0.7033 },
+    [35] = { CFrame = CFrame.new(-18.901, 29.726, 359.099) * CFrame.Angles(math.rad(-177.76), math.rad(13.65), math.rad(179.47)), Scale = 0.7033 },
+    [36] = { CFrame = CFrame.new(-17.273, 29.344, 360.459) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+    [37] = { CFrame = CFrame.new(-15.715, 29.780, 373.090) * CFrame.Angles(math.rad(-177.87), math.rad(1.56), math.rad(179.49)), Scale = 0.7033 },
+    [38] = { CFrame = CFrame.new(-13.820, 29.780, 372.647) * CFrame.Angles(math.rad(-177.94), math.rad(-6.35), math.rad(179.48)), Scale = 0.7033 },
+    [39] = { CFrame = CFrame.new(-31.434, 31.589, 365.142) * CFrame.Angles(math.rad(179.30), math.rad(2.93), math.rad(0.04)), Scale = 0.7610 },
+    [40] = { CFrame = CFrame.new(-16.092, 31.043, 365.489) * CFrame.Angles(math.rad(-180.00), math.rad(2.93), math.rad(-180.00)), Scale = 0.7610 },
+    }, 
+    Skill1 = {
+	[1] = { CFrame = CFrame.new(-51.910, 104.250, 399.660) * CFrame.Angles(math.rad(94.32), math.rad(-24.38), math.rad(-74.56)), Scale = 0.8090 },
+	[2] = { CFrame = CFrame.new(7.291, 104.034, 394.375) * CFrame.Angles(math.rad(106.65), math.rad(64.28), math.rad(57.52)), Scale = 0.8090 },
+	[3] = { CFrame = CFrame.new(-23.346, 101.576, 345.295) * CFrame.Angles(math.rad(-125.51), math.rad(73.19), math.rad(164.46)), Scale = 2.1637 },
+	[4] = { CFrame = CFrame.new(-24.037, 101.527, 345.334) * CFrame.Angles(math.rad(68.54), math.rad(77.37), math.rad(-29.99)), Scale = 2.1637 },
+	[5] = { CFrame = CFrame.new(-28.468, 138.919, 372.534) * CFrame.Angles(math.rad(-98.41), math.rad(19.09), math.rad(-109.54)), Scale = 2.5000 },
+	[6] = { CFrame = CFrame.new(-18.556, 131.247, 375.804) * CFrame.Angles(math.rad(-18.31), math.rad(-28.17), math.rad(56.79)), Scale = 2.5000 },
+	[7] = { CFrame = CFrame.new(-23.216, 120.342, 361.307) * CFrame.Angles(math.rad(-141.17), math.rad(40.49), math.rad(-179.35)), Scale = 1.5776 },
+	[8] = { CFrame = CFrame.new(-28.685, 66.348, 356.197) * CFrame.Angles(math.rad(166.76), math.rad(-42.80), math.rad(-175.65)), Scale = 2.5000 },
+	[9] = { CFrame = CFrame.new(-18.769, 66.329, 357.319) * CFrame.Angles(math.rad(164.82), math.rad(52.52), math.rad(176.62)), Scale = 2.5000 },
+	[10] = { CFrame = CFrame.new(-30.066, 30.583, 346.648) * CFrame.Angles(math.rad(-166.64), math.rad(44.97), math.rad(-177.59)), Scale = 2.5000 },
+	[11] = { CFrame = CFrame.new(-16.412, 30.634, 347.092) * CFrame.Angles(math.rad(10.78), math.rad(48.35), math.rad(5.76)), Scale = 2.5000 },
+	[12] = { CFrame = CFrame.new(-28.912, 126.772, 365.218) * CFrame.Angles(math.rad(-65.74), math.rad(-74.48), math.rad(113.85)), Scale = 2.5000 },
+	[13] = { CFrame = CFrame.new(-37.217, 91.039, 364.696) * CFrame.Angles(math.rad(-118.60), math.rad(-17.30), math.rad(158.40)), Scale = 2.5000 },
+	[14] = { CFrame = CFrame.new(-17.424, 126.563, 365.872) * CFrame.Angles(math.rad(113.55), math.rad(-70.54), math.rad(-80.56)), Scale = 2.5000 },
+	[15] = { CFrame = CFrame.new(-5.543, 91.929, 357.601) * CFrame.Angles(math.rad(58.85), math.rad(-37.28), math.rad(-22.25)), Scale = 2.5000 },
+	[16] = { CFrame = CFrame.new(-24.532, 130.272, 369.131) * CFrame.Angles(math.rad(-52.56), math.rad(12.23), math.rad(-178.83)), Scale = 1.0000 },
+	[17] = { CFrame = CFrame.new(-21.310, 130.167, 369.216) * CFrame.Angles(math.rad(135.31), math.rad(12.86), math.rad(176.13)), Scale = 1.0000 },
+	[18] = { CFrame = CFrame.new(-22.618, 114.884, 367.494) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.9339 },
+	[19] = { CFrame = CFrame.new(-22.616, 112.040, 365.000) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 1.2510 },
+	[20] = { CFrame = CFrame.new(-22.705, 109.923, 361.661) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.9435 },
+	[21] = { CFrame = CFrame.new(-23.109, 107.584, 358.870) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.6841 },
+	[22] = { CFrame = CFrame.new(-23.115, 104.777, 356.133) * CFrame.Angles(math.rad(-14.30), math.rad(3.15), math.rad(2.46)), Scale = 0.5016 },
+	[23] = { CFrame = CFrame.new(-50.499, 105.354, 406.655) * CFrame.Angles(math.rad(167.78), math.rad(3.66), math.rad(123.54)), Scale = 0.7418 },
+	[24] = { CFrame = CFrame.new(-51.264, 103.417, 407.605) * CFrame.Angles(math.rad(-178.82), math.rad(12.20), math.rad(121.67)), Scale = 0.9435 },
+	[25] = { CFrame = CFrame.new(-51.889, 102.394, 406.287) * CFrame.Angles(math.rad(-175.47), math.rad(14.20), math.rad(120.89)), Scale = 0.7418 },
+	[26] = { CFrame = CFrame.new(-52.192, 101.680, 405.164) * CFrame.Angles(math.rad(-171.88), math.rad(16.22), math.rad(119.94)), Scale = 0.6457 },
+	[27] = { CFrame = CFrame.new(6.237, 104.170, 400.815) * CFrame.Angles(math.rad(-15.28), math.rad(4.63), math.rad(-23.52)), Scale = 0.7418 },
+	[28] = { CFrame = CFrame.new(7.745, 103.354, 401.787) * CFrame.Angles(math.rad(-13.18), math.rad(15.30), math.rad(-25.37)), Scale = 0.9435 },
+	[29] = { CFrame = CFrame.new(8.648, 102.962, 400.351) * CFrame.Angles(math.rad(-10.12), math.rad(16.06), math.rad(-24.45)), Scale = 0.7418 },
+	[30] = { CFrame = CFrame.new(9.554, 102.642, 399.517) * CFrame.Angles(math.rad(-4.74), math.rad(25.08), math.rad(-28.89)), Scale = 0.6457 },
+	[31] = { CFrame = CFrame.new(-34.158, 29.726, 358.768) * CFrame.Angles(math.rad(-177.75), math.rad(15.21), math.rad(179.47)), Scale = 0.7033 },
+	[32] = { CFrame = CFrame.new(-32.611, 29.726, 359.777) * CFrame.Angles(math.rad(-177.83), math.rad(5.96), math.rad(179.48)), Scale = 0.7033 },
+	[33] = { CFrame = CFrame.new(-30.654, 29.344, 360.005) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+	[34] = { CFrame = CFrame.new(-28.807, 29.726, 358.556) * CFrame.Angles(math.rad(-177.99), math.rad(-12.03), math.rad(179.48)), Scale = 0.7033 },
+	[35] = { CFrame = CFrame.new(-18.901, 29.726, 359.099) * CFrame.Angles(math.rad(-177.76), math.rad(13.65), math.rad(179.47)), Scale = 0.7033 },
+	[36] = { CFrame = CFrame.new(-17.273, 29.344, 360.459) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+	[37] = { CFrame = CFrame.new(-15.473, 29.726, 359.826) * CFrame.Angles(math.rad(-177.87), math.rad(1.57), math.rad(179.49)), Scale = 0.7033 },
+	[38] = { CFrame = CFrame.new(-13.578, 29.726, 359.382) * CFrame.Angles(math.rad(-177.94), math.rad(-6.35), math.rad(179.48)), Scale = 0.7033 },
+	[39] = { CFrame = CFrame.new(-31.192, 31.534, 351.878) * CFrame.Angles(math.rad(179.30), math.rad(2.93), math.rad(0.04)), Scale = 0.7610 },
+	[40] = { CFrame = CFrame.new(-15.850, 30.988, 352.224) * CFrame.Angles(math.rad(-180.00), math.rad(2.93), math.rad(-180.00)), Scale = 0.7610 },
+    }, 
+    Skill2 = {
+	[1] = { CFrame = CFrame.new(-25.181, 33.758, 437.551) * CFrame.Angles(math.rad(36.84), math.rad(-69.47), math.rad(-159.32)), Scale = 0.8090 },
+	[2] = { CFrame = CFrame.new(-14.982, 33.376, 440.712) * CFrame.Angles(math.rad(61.20), math.rad(75.95), math.rad(129.57)), Scale = 0.8090 },
+	[3] = { CFrame = CFrame.new(-22.388, 83.712, 378.284) * CFrame.Angles(math.rad(-100.38), math.rad(74.19), math.rad(170.39)), Scale = 2.1637 },
+	[4] = { CFrame = CFrame.new(-23.079, 83.665, 378.310) * CFrame.Angles(math.rad(104.49), math.rad(75.87), math.rad(-35.28)), Scale = 2.1637 },
+	[5] = { CFrame = CFrame.new(-25.996, 101.930, 420.919) * CFrame.Angles(math.rad(-67.95), math.rad(20.79), math.rad(-108.54)), Scale = 2.5000 },
+	[6] = { CFrame = CFrame.new(-16.296, 93.457, 419.539) * CFrame.Angles(math.rad(11.71), math.rad(-26.93), math.rad(55.09)), Scale = 2.5000 },
+	[7] = { CFrame = CFrame.new(-21.471, 91.619, 401.633) * CFrame.Angles(math.rad(-111.96), math.rad(41.08), math.rad(-176.90)), Scale = 1.5776 },
+	[8] = { CFrame = CFrame.new(-25.435, 59.941, 409.714) * CFrame.Angles(math.rad(125.05), math.rad(-43.76), math.rad(179.51)), Scale = 2.5000 },
+	[9] = { CFrame = CFrame.new(-18.019, 52.617, 401.055) * CFrame.Angles(math.rad(146.90), math.rad(51.44), math.rad(175.46)), Scale = 2.5000 },
+	[10] = { CFrame = CFrame.new(-24.937, 30.924, 386.492) * CFrame.Angles(math.rad(-140.13), math.rad(47.90), math.rad(179.12)), Scale = 2.5000 },
+	[11] = { CFrame = CFrame.new(-17.159, 30.994, 371.901) * CFrame.Angles(math.rad(49.95), math.rad(52.42), math.rad(2.41)), Scale = 2.5000 },
+	[12] = { CFrame = CFrame.new(-27.066, 94.487, 407.081) * CFrame.Angles(math.rad(-76.48), math.rad(-81.53), math.rad(104.13)), Scale = 2.5000 },
+	[13] = { CFrame = CFrame.new(-32.858, 57.509, 406.791) * CFrame.Angles(math.rad(-43.22), math.rad(-27.11), math.rad(-167.55)), Scale = 2.5000 },
+	[14] = { CFrame = CFrame.new(-15.326, 94.168, 406.691) * CFrame.Angles(math.rad(92.18), math.rad(-82.38), math.rad(-85.59)), Scale = 2.5000 },
+	[15] = { CFrame = CFrame.new(-10.356, 56.615, 408.271) * CFrame.Angles(math.rad(133.93), math.rad(-34.73), math.rad(8.92)), Scale = 2.5000 },
+	[16] = { CFrame = CFrame.new(-22.377, 96.167, 413.468) * CFrame.Angles(math.rad(-21.62), math.rad(14.08), math.rad(-179.42)), Scale = 1.0000 },
+	[17] = { CFrame = CFrame.new(-19.160, 95.965, 413.402) * CFrame.Angles(math.rad(165.94), math.rad(11.08), math.rad(176.95)), Scale = 1.0000 },
+	[18] = { CFrame = CFrame.new(-20.974, 83.751, 404.138) * CFrame.Angles(math.rad(16.62), math.rad(4.25), math.rad(0.85)), Scale = 0.9339 },
+	[19] = { CFrame = CFrame.new(-21.093, 82.587, 400.541) * CFrame.Angles(math.rad(16.62), math.rad(4.25), math.rad(0.85)), Scale = 1.2510 },
+	[20] = { CFrame = CFrame.new(-21.288, 82.482, 396.592) * CFrame.Angles(math.rad(16.62), math.rad(4.25), math.rad(0.85)), Scale = 0.9435 },
+	[21] = { CFrame = CFrame.new(-21.800, 81.912, 393.009) * CFrame.Angles(math.rad(16.62), math.rad(4.25), math.rad(0.85)), Scale = 0.6841 },
+	[22] = { CFrame = CFrame.new(-21.927, 80.904, 389.222) * CFrame.Angles(math.rad(16.62), math.rad(4.25), math.rad(0.85)), Scale = 0.5016 },
+	[23] = { CFrame = CFrame.new(-20.822, 30.322, 442.169) * CFrame.Angles(math.rad(-161.38), math.rad(-33.09), math.rad(-179.11)), Scale = 0.7418 },
+	[24] = { CFrame = CFrame.new(-22.320, 29.307, 443.570) * CFrame.Angles(math.rad(-161.64), math.rad(-17.31), math.rad(-179.19)), Scale = 0.9435 },
+	[25] = { CFrame = CFrame.new(-23.951, 29.731, 442.994) * CFrame.Angles(math.rad(-161.71), math.rad(-13.49), math.rad(-179.23)), Scale = 0.7418 },
+	[26] = { CFrame = CFrame.new(-25.118, 30.025, 442.351) * CFrame.Angles(math.rad(-161.76), math.rad(-9.48), math.rad(-179.24)), Scale = 0.6457 },
+	[27] = { CFrame = CFrame.new(-18.052, 30.665, 445.795) * CFrame.Angles(math.rad(9.55), math.rad(-17.96), math.rad(-12.75)), Scale = 0.7418 },
+	[28] = { CFrame = CFrame.new(-16.775, 29.704, 446.949) * CFrame.Angles(math.rad(9.60), math.rad(-7.09), math.rad(-14.24)), Scale = 0.9435 },
+	[29] = { CFrame = CFrame.new(-15.387, 30.064, 445.962) * CFrame.Angles(math.rad(12.32), math.rad(-5.74), math.rad(-12.17)), Scale = 0.7418 },
+	[30] = { CFrame = CFrame.new(-14.210, 30.237, 445.513) * CFrame.Angles(math.rad(15.18), math.rad(4.16), math.rad(-14.68)), Scale = 0.6457 },
+	[31] = { CFrame = CFrame.new(-29.085, 29.750, 399.112) * CFrame.Angles(math.rad(-177.75), math.rad(15.21), math.rad(179.47)), Scale = 0.7033 },
+	[32] = { CFrame = CFrame.new(-27.537, 29.750, 400.121) * CFrame.Angles(math.rad(-177.83), math.rad(5.96), math.rad(179.48)), Scale = 0.7033 },
+	[33] = { CFrame = CFrame.new(-25.581, 29.369, 400.349) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+	[34] = { CFrame = CFrame.new(-23.734, 29.750, 398.899) * CFrame.Angles(math.rad(-177.99), math.rad(-12.03), math.rad(179.48)), Scale = 0.7033 },
+	[35] = { CFrame = CFrame.new(-19.630, 29.750, 385.047) * CFrame.Angles(math.rad(-177.76), math.rad(13.65), math.rad(179.47)), Scale = 0.7033 },
+	[36] = { CFrame = CFrame.new(-18.002, 29.369, 386.408) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+	[37] = { CFrame = CFrame.new(-16.202, 29.750, 385.774) * CFrame.Angles(math.rad(-177.87), math.rad(1.57), math.rad(179.49)), Scale = 0.7033 },
+	[38] = { CFrame = CFrame.new(-14.307, 29.750, 385.331) * CFrame.Angles(math.rad(-177.94), math.rad(-6.35), math.rad(179.48)), Scale = 0.7033 },
+	[39] = { CFrame = CFrame.new(-26.119, 31.559, 392.221) * CFrame.Angles(math.rad(179.30), math.rad(2.93), math.rad(0.04)), Scale = 0.7610 },
+	[40] = { CFrame = CFrame.new(-16.579, 31.013, 378.173) * CFrame.Angles(math.rad(-180.00), math.rad(2.93), math.rad(-180.00)), Scale = 0.7610 },
+    }, 
+    Emote1 = {
+	[1] = { CFrame = CFrame.new(-46.851, 32.564, 395.138) * CFrame.Angles(math.rad(29.44), math.rad(-73.33), math.rad(-157.26)), Scale = 0.8090 },
+	[2] = { CFrame = CFrame.new(1.217, 33.281, 374.794) * CFrame.Angles(math.rad(158.84), math.rad(77.19), math.rad(32.88)), Scale = 0.8090 },
+	[3] = { CFrame = CFrame.new(-26.247, 71.689, 351.976) * CFrame.Angles(math.rad(-121.83), math.rad(72.48), math.rad(177.17)), Scale = 2.1637 },
+	[4] = { CFrame = CFrame.new(-26.936, 71.643, 352.044) * CFrame.Angles(math.rad(99.88), math.rad(76.23), math.rad(-45.91)), Scale = 2.1637 },
+	[5] = { CFrame = CFrame.new(-28.530, 100.251, 388.605) * CFrame.Angles(math.rad(-83.85), math.rad(20.51), math.rad(-105.78)), Scale = 2.5000 },
+	[6] = { CFrame = CFrame.new(-18.716, 91.808, 389.025) * CFrame.Angles(math.rad(-2.89), math.rad(-24.45), math.rad(55.87)), Scale = 2.5000 },
+	[7] = { CFrame = CFrame.new(-24.564, 85.361, 372.441) * CFrame.Angles(math.rad(-128.28), math.rad(39.08), math.rad(-174.75)), Scale = 1.5776 },
+	[8] = { CFrame = CFrame.new(-32.249, 62.805, 388.805) * CFrame.Angles(math.rad(107.13), math.rad(-45.09), math.rad(-173.94)), Scale = 2.5000 },
+	[9] = { CFrame = CFrame.new(-20.980, 52.400, 384.332) * CFrame.Angles(math.rad(122.58), math.rad(46.95), math.rad(175.23)), Scale = 2.5000 },
+	[10] = { CFrame = CFrame.new(-31.720, 30.341, 368.233) * CFrame.Angles(math.rad(-147.38), math.rad(45.75), math.rad(178.91)), Scale = 2.5000 },
+	[11] = { CFrame = CFrame.new(-17.796, 31.566, 352.956) * CFrame.Angles(math.rad(50.21), math.rad(51.38), math.rad(7.89)), Scale = 2.5000 },
+	[12] = { CFrame = CFrame.new(-29.696, 90.477, 378.540) * CFrame.Angles(math.rad(-30.61), math.rad(-60.55), math.rad(126.70)), Scale = 2.5000 },
+	[13] = { CFrame = CFrame.new(-44.584, 59.311, 366.796) * CFrame.Angles(math.rad(-49.43), math.rad(-59.11), math.rad(171.14)), Scale = 2.5000 },
+	[14] = { CFrame = CFrame.new(-18.487, 90.099, 377.872) * CFrame.Angles(math.rad(127.92), math.rad(-73.16), math.rad(-94.87)), Scale = 2.5000 },
+	[15] = { CFrame = CFrame.new(-7.734, 64.216, 352.358) * CFrame.Angles(math.rad(122.17), math.rad(-62.38), math.rad(-28.67)), Scale = 2.5000 },
+	[16] = { CFrame = CFrame.new(-25.092, 92.798, 382.735) * CFrame.Angles(math.rad(-37.08), math.rad(15.76), math.rad(-177.37)), Scale = 1.0000 },
+	[17] = { CFrame = CFrame.new(-21.876, 92.618, 382.582) * CFrame.Angles(math.rad(151.31), math.rad(9.16), math.rad(175.21)), Scale = 1.0000 },
+	[18] = { CFrame = CFrame.new(-23.801, 78.411, 376.861) * CFrame.Angles(math.rad(1.63), math.rad(6.80), math.rad(1.36)), Scale = 0.9339 },
+	[19] = { CFrame = CFrame.new(-24.039, 76.357, 373.694) * CFrame.Angles(math.rad(1.63), math.rad(6.80), math.rad(1.36)), Scale = 1.2510 },
+	[20] = { CFrame = CFrame.new(-24.390, 75.235, 369.918) * CFrame.Angles(math.rad(1.63), math.rad(6.80), math.rad(1.36)), Scale = 0.9435 },
+	[21] = { CFrame = CFrame.new(-25.033, 73.755, 366.629) * CFrame.Angles(math.rad(1.63), math.rad(6.80), math.rad(1.36)), Scale = 0.6841 },
+	[22] = { CFrame = CFrame.new(-25.290, 71.803, 363.238) * CFrame.Angles(math.rad(1.63), math.rad(6.80), math.rad(1.36)), Scale = 0.5016 },
+	[23] = { CFrame = CFrame.new(-42.889, 29.835, 400.522) * CFrame.Angles(math.rad(-170.37), math.rad(-29.23), math.rad(-178.36)), Scale = 0.7418 },
+	[24] = { CFrame = CFrame.new(-44.500, 29.096, 401.970) * CFrame.Angles(math.rad(-170.84), math.rad(-13.46), math.rad(-178.53)), Scale = 0.9435 },
+	[25] = { CFrame = CFrame.new(-46.080, 29.456, 401.228) * CFrame.Angles(math.rad(-170.94), math.rad(-9.65), math.rad(-178.55)), Scale = 0.7418 },
+	[26] = { CFrame = CFrame.new(-47.196, 29.665, 400.472) * CFrame.Angles(math.rad(-171.03), math.rad(-5.63), math.rad(-178.57)), Scale = 0.6457 },
+	[27] = { CFrame = CFrame.new(0.289, 30.064, 380.398) * CFrame.Angles(math.rad(12.65), math.rad(1.66), math.rad(-8.80)), Scale = 0.7418 },
+	[28] = { CFrame = CFrame.new(1.975, 29.264, 381.030) * CFrame.Angles(math.rad(11.91), math.rad(12.49), math.rad(-10.20)), Scale = 0.9435 },
+	[29] = { CFrame = CFrame.new(2.921, 29.832, 379.684) * CFrame.Angles(math.rad(14.62), math.rad(14.01), math.rad(-9.07)), Scale = 0.7418 },
+	[30] = { CFrame = CFrame.new(3.862, 30.175, 378.900) * CFrame.Angles(math.rad(17.13), math.rad(24.05), math.rad(-12.43)), Scale = 0.6457 },
+	[31] = { CFrame = CFrame.new(-35.187, 29.726, 381.345) * CFrame.Angles(math.rad(-177.78), math.rad(11.85), math.rad(179.61)), Scale = 0.7033 },
+	[32] = { CFrame = CFrame.new(-33.583, 29.726, 382.262) * CFrame.Angles(math.rad(-177.84), math.rad(2.60), math.rad(179.61)), Scale = 0.7033 },
+	[33] = { CFrame = CFrame.new(-31.616, 29.344, 382.375) * CFrame.Angles(math.rad(-177.86), math.rad(-0.57), math.rad(179.61)), Scale = 0.8571 },
+	[34] = { CFrame = CFrame.new(-29.858, 29.726, 380.819) * CFrame.Angles(math.rad(-177.96), math.rad(-15.39), math.rad(179.60)), Scale = 0.7033 },
+	[35] = { CFrame = CFrame.new(-19.563, 29.701, 365.529) * CFrame.Angles(math.rad(-177.79), math.rad(10.29), math.rad(179.61)), Scale = 0.7033 },
+	[36] = { CFrame = CFrame.new(-17.858, 29.319, 366.792) * CFrame.Angles(math.rad(-177.86), math.rad(-0.57), math.rad(179.61)), Scale = 0.8571 },
+	[37] = { CFrame = CFrame.new(-16.098, 29.701, 366.054) * CFrame.Angles(math.rad(-177.87), math.rad(-1.79), math.rad(179.61)), Scale = 0.7033 },
+	[38] = { CFrame = CFrame.new(-14.233, 29.701, 365.500) * CFrame.Angles(math.rad(-177.92), math.rad(-9.71), math.rad(179.61)), Scale = 0.7033 },
+	[39] = { CFrame = CFrame.new(-32.631, 31.534, 374.293) * CFrame.Angles(math.rad(179.30), math.rad(-0.43), math.rad(-0.00)), Scale = 0.7610 },
+	[40] = { CFrame = CFrame.new(-16.921, 30.963, 358.488) * CFrame.Angles(math.rad(-180.00), math.rad(-0.43), math.rad(-180.00)), Scale = 0.7610 },
+    }, 
+    Emote2 = {
+	[1] = { CFrame = CFrame.new(-70.608, 89.105, 361.923) * CFrame.Angles(math.rad(125.90), math.rad(11.15), math.rad(-47.21)), Scale = 0.8090 },
+	[2] = { CFrame = CFrame.new(16.707, 89.863, 373.826) * CFrame.Angles(math.rad(105.01), math.rad(-25.83), math.rad(57.99)), Scale = 0.8090 },
+	[3] = { CFrame = CFrame.new(-24.487, 100.770, 356.171) * CFrame.Angles(math.rad(-128.03), math.rad(73.83), math.rad(168.30)), Scale = 2.1637 },
+	[4] = { CFrame = CFrame.new(-25.178, 100.735, 356.215) * CFrame.Angles(math.rad(73.33), math.rad(76.43), math.rad(-33.72)), Scale = 2.1637 },
+	[5] = { CFrame = CFrame.new(-28.612, 137.654, 384.195) * CFrame.Angles(math.rad(-97.49), math.rad(20.18), math.rad(-108.86)), Scale = 2.5000 },
+	[6] = { CFrame = CFrame.new(-18.833, 129.716, 387.223) * CFrame.Angles(math.rad(-17.67), math.rad(-27.33), math.rad(55.70)), Scale = 2.5000 },
+	[7] = { CFrame = CFrame.new(-23.837, 119.203, 372.553) * CFrame.Angles(math.rad(-141.07), math.rad(40.84), math.rad(-177.74)), Scale = 1.5776 },
+	[8] = { CFrame = CFrame.new(-29.628, 65.429, 369.310) * CFrame.Angles(math.rad(163.92), math.rad(-45.18), math.rad(-175.99)), Scale = 2.5000 },
+	[9] = { CFrame = CFrame.new(-19.674, 65.388, 370.025) * CFrame.Angles(math.rad(162.61), math.rad(50.15), math.rad(176.11)), Scale = 2.5000 },
+	[10] = { CFrame = CFrame.new(-30.568, 30.235, 358.846) * CFrame.Angles(math.rad(-165.25), math.rad(45.80), math.rad(-178.05)), Scale = 2.5000 },
+	[11] = { CFrame = CFrame.new(-16.922, 30.303, 359.501) * CFrame.Angles(math.rad(11.53), math.rad(47.51), math.rad(6.18)), Scale = 2.5000 },
+	[12] = { CFrame = CFrame.new(-28.683, 124.322, 377.787) * CFrame.Angles(math.rad(-73.80), math.rad(-57.35), math.rad(41.82)), Scale = 2.5000 },
+	[13] = { CFrame = CFrame.new(-41.897, 112.226, 345.621) * CFrame.Angles(math.rad(-173.37), math.rad(-34.83), math.rad(58.09)), Scale = 2.5000 },
+	[14] = { CFrame = CFrame.new(-18.181, 124.408, 378.059) * CFrame.Angles(math.rad(153.27), math.rad(-69.06), math.rad(-92.69)), Scale = 2.5000 },
+	[15] = { CFrame = CFrame.new(-5.156, 110.471, 346.243) * CFrame.Angles(math.rad(-31.21), math.rad(-32.56), math.rad(-141.50)), Scale = 2.5000 },
+	[16] = { CFrame = CFrame.new(-24.883, 128.998, 380.585) * CFrame.Angles(math.rad(-51.33), math.rad(13.45), math.rad(-179.17)), Scale = 1.0000 },
+	[17] = { CFrame = CFrame.new(-21.664, 128.827, 380.639) * CFrame.Angles(math.rad(136.35), math.rad(11.68), math.rad(176.64)), Scale = 1.0000 },
+	[18] = { CFrame = CFrame.new(-23.299, 113.610, 378.624) * CFrame.Angles(math.rad(-13.08), math.rad(3.91), math.rad(1.43)), Scale = 0.9339 },
+	[19] = { CFrame = CFrame.new(-23.378, 110.818, 376.074) * CFrame.Angles(math.rad(-13.08), math.rad(3.91), math.rad(1.43)), Scale = 1.2510 },
+	[20] = { CFrame = CFrame.new(-23.538, 108.771, 372.694) * CFrame.Angles(math.rad(-13.08), math.rad(3.91), math.rad(1.43)), Scale = 0.9435 },
+	[21] = { CFrame = CFrame.new(-24.013, 106.498, 369.861) * CFrame.Angles(math.rad(-13.08), math.rad(3.91), math.rad(1.43)), Scale = 0.6841 },
+	[22] = { CFrame = CFrame.new(-24.099, 103.747, 367.068) * CFrame.Angles(math.rad(-13.08), math.rad(3.91), math.rad(1.43)), Scale = 0.5016 },
+	[23] = { CFrame = CFrame.new(-73.580, 86.582, 367.999) * CFrame.Angles(math.rad(-152.43), math.rad(38.99), math.rad(93.76)), Scale = 0.7418 },
+	[24] = { CFrame = CFrame.new(-73.622, 84.327, 367.607) * CFrame.Angles(math.rad(-132.22), math.rad(38.28), math.rad(81.08)), Scale = 0.9435 },
+	[25] = { CFrame = CFrame.new(-72.910, 84.060, 365.996) * CFrame.Angles(math.rad(-127.46), math.rad(37.60), math.rad(78.14)), Scale = 0.7418 },
+	[26] = { CFrame = CFrame.new(-72.218, 84.008, 364.821) * CFrame.Angles(math.rad(-122.56), math.rad(36.65), math.rad(75.18)), Scale = 0.6457 },
+	[27] = { CFrame = CFrame.new(18.638, 89.309, 380.037) * CFrame.Angles(math.rad(20.32), math.rad(31.36), math.rad(-116.50)), Scale = 0.7418 },
+	[28] = { CFrame = CFrame.new(18.122, 87.555, 380.774) * CFrame.Angles(math.rad(32.28), math.rad(28.20), math.rad(-123.93)), Scale = 0.9435 },
+	[29] = { CFrame = CFrame.new(17.343, 87.008, 379.317) * CFrame.Angles(math.rad(32.68), math.rad(25.19), math.rad(-122.37)), Scale = 0.7418 },
+	[30] = { CFrame = CFrame.new(16.802, 86.315, 378.397) * CFrame.Angles(math.rad(41.44), math.rad(18.85), math.rad(-128.21)), Scale = 0.6457 },
+	[31] = { CFrame = CFrame.new(-34.659, 29.726, 371.077) * CFrame.Angles(math.rad(-177.75), math.rad(15.21), math.rad(179.47)), Scale = 0.7033 },
+	[32] = { CFrame = CFrame.new(-33.112, 29.726, 372.086) * CFrame.Angles(math.rad(-177.83), math.rad(5.96), math.rad(179.48)), Scale = 0.7033 },
+	[33] = { CFrame = CFrame.new(-31.155, 29.344, 372.314) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+	[34] = { CFrame = CFrame.new(-29.308, 29.726, 370.865) * CFrame.Angles(math.rad(-177.99), math.rad(-12.03), math.rad(179.48)), Scale = 0.7033 },
+	[35] = { CFrame = CFrame.new(-19.403, 29.726, 371.408) * CFrame.Angles(math.rad(-177.76), math.rad(13.65), math.rad(179.47)), Scale = 0.7033 },
+	[36] = { CFrame = CFrame.new(-17.775, 29.344, 372.768) * CFrame.Angles(math.rad(-177.86), math.rad(2.80), math.rad(179.49)), Scale = 0.8571 },
+	[37] = { CFrame = CFrame.new(-15.975, 29.726, 372.134) * CFrame.Angles(math.rad(-177.87), math.rad(1.57), math.rad(179.49)), Scale = 0.7033 },
+	[38] = { CFrame = CFrame.new(-14.080, 29.726, 371.691) * CFrame.Angles(math.rad(-177.94), math.rad(-6.35), math.rad(179.48)), Scale = 0.7033 },
+	[39] = { CFrame = CFrame.new(-31.694, 31.534, 364.187) * CFrame.Angles(math.rad(179.30), math.rad(2.93), math.rad(0.04)), Scale = 0.7610 },
+	[40] = { CFrame = CFrame.new(-16.352, 30.988, 364.533) * CFrame.Angles(math.rad(-180.00), math.rad(2.93), math.rad(-180.00)), Scale = 0.7610 },
+    }
+}
+
+local function UnpackMatrixData(data)
+    if typeof(data) == "CFrame" then return data, nil end
+    if typeof(data) == "table" then return data.CFrame or CFrame.identity, data.Scale end
+    return CFrame.identity, nil
+end
+
+-- [[ UI CONTEXT CREATION - DEEP HORROR ABYSS THEME ]] --
+local sg = Instance.new("ScreenGui", CoreGui)
+sg.Name = "Indominus_Camouflage_Overclock_Hub"
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 220, 0, 460) 
+main.Position = UDim2.new(0.05, 0, 0.15, 0)
+main.BackgroundColor3 = Color3.fromRGB(5, 0, 0) 
+main.BorderSizePixel = 0
+main.ClipsDescendants = true
+
+local titleBar = Instance.new("Frame", main)
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+titleBar.BorderSizePixel = 0
+
+local titleLabel = Instance.new("TextLabel", titleBar)
+titleLabel.Size = UDim2.new(1, -40, 1, 0)
+titleLabel.Position = UDim2.new(0, 8, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "SIREN HEAD THE STALKER- Josep Bart"
+titleLabel.TextColor3 = Color3.fromRGB(255, 30, 30)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 13
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local MinBtn = Instance.new("TextButton", titleBar)
+MinBtn.Size = UDim2.new(0, 22, 0, 22)
+MinBtn.Position = UDim2.new(1, -26, 0, 4)
+MinBtn.BackgroundColor3 = Color3.fromRGB(5, 0, 0)
+MinBtn.BorderSizePixel = 1
+MinBtn.BorderColor3 = Color3.fromRGB(150, 0, 0)
+MinBtn.Text = "▲"
+MinBtn.TextColor3 = Color3.new(1, 1, 1)
+MinBtn.Font = Enum.Font.SourceSansBold
+MinBtn.TextSize = 12
+local btnCorner = Instance.new("UICorner", MinBtn)
+btnCorner.CornerRadius = UDim.new(0, 4)
+
+local contentContainer = Instance.new("Frame", main)
+contentContainer.Size = UDim2.new(1, 0, 1, -30)
+contentContainer.Position = UDim2.new(0, 0, 0, 30)
+contentContainer.BackgroundTransparency = 1
+contentContainer.ClipsDescendants = true
+
+local dragging, dragStart, startPos
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging, dragStart, startPos = true, input.Position, main.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+
+local function styleBtn(b)
+    b.BackgroundColor3, b.BorderSizePixel, b.BorderColor3 = Color3.fromRGB(40, 0, 0), 1, Color3.fromRGB(150, 0, 0)
+    b.TextColor3, b.Font, b.TextSize = Color3.fromRGB(255, 30, 30), Enum.Font.SourceSansBold, 11
+    b.MouseEnter:Connect(function() b.BorderColor3 = Color3.fromRGB(255, 30, 30) b.TextColor3 = Color3.new(1,1,1) end)
+    b.MouseLeave:Connect(function() b.BorderColor3 = Color3.fromRGB(150, 0, 0) b.TextColor3 = Color3.fromRGB(255, 30, 30) end)
+end
+
+local function createBtn(txt, pos, size, parent)
+    local b = Instance.new("TextButton", parent or contentContainer)
+    b.Text, b.Position, b.Size = txt, pos, size styleBtn(b)
+    return b
+end
+
+local mainFrame = Instance.new("Frame", contentContainer)
+mainFrame.Size = UDim2.new(1, -10, 0, 95)
+mainFrame.Position = UDim2.new(0, 5, 0, 5)
+mainFrame.BackgroundTransparency = 1
+
+local SummonBtn  = createBtn("SUMMON SIREN HEAD", UDim2.new(0,0,0,0), UDim2.new(1,0,0.30,0), mainFrame)
+local cBtn       = createBtn("Noclip: OFF", UDim2.new(0,0,0.35,0), UDim2.new(0.5,-2,0.30,0), mainFrame)
+local airWalkBtn = createBtn("Air Walk: OFF", UDim2.new(0.5,2,0.35,0), UDim2.new(0.5,-2,0.30,0), mainFrame)
+
+local camoBtn  = createBtn("SKILL KAMUFLASE: OFF", UDim2.new(0,0,0.70,0), UDim2.new(1,0,0.30,0), mainFrame)
+
+local line = Instance.new("Frame", contentContainer)
+line.Size = UDim2.new(1, -10, 0, 1)
+line.Position = UDim2.new(0, 5, 0, 105)
+line.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+line.BorderSizePixel = 0
+
+local bombFrame = Instance.new("Frame", contentContainer)
+bombFrame.Size = UDim2.new(1, -10, 0, 295)
+bombFrame.Position = UDim2.new(0, 5, 0, 110) 
+bombFrame.BackgroundTransparency = 1
+
+local Counter = Instance.new("TextLabel", bombFrame)
+Counter.Size = UDim2.new(1, 0, 0, 18)
+Counter.Position = UDim2.new(0, 0, 0, 0)
+Counter.Text = "BOMBS COUNTER: 0"
+Counter.TextColor3 = Color3.fromRGB(255, 255, 255)
+Counter.Font = Enum.Font.SourceSansBold
+Counter.TextSize = 12
+Counter.BackgroundTransparency = 1
+
+local bReload   = createBtn("SKILL TP + DUPE BOMB", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 22), bombFrame)
+local bEquip    = createBtn("EQUIP ALL BOMBS", UDim2.new(0, 0, 0, 45), UDim2.new(1, 0, 0, 22), bombFrame)
+local bBlast    = createBtn("PLACE ALL BOMBS", UDim2.new(0, 0, 0, 70), UDim2.new(1, 0, 0, 22), bombFrame)
+local bDetonate = createBtn("DETONATE ALL BOMBS", UDim2.new(0, 0, 0, 95), UDim2.new(1, 0, 0, 22), bombFrame)
+
+local bBite     = createBtn("NIGHTMARE CLAW", UDim2.new(0, 0, 0, 120), UDim2.new(1, 0, 0, 22), bombFrame)
+local bSkill    = createBtn("JUMPSCARE GRAB", UDim2.new(0, 0, 0, 145), UDim2.new(1, 0, 0, 22), bombFrame)
+local bEmote    = createBtn("SIREN HEAD ROAR", UDim2.new(0, 0, 0, 170), UDim2.new(1, 0, 0, 22), bombFrame)
+
+local invBtn    = createBtn("INVISIBLE: OFF", UDim2.new(0, 0, 0, 195), UDim2.new(1, 0, 0, 22), bombFrame)
+
+local creditLabel = Instance.new("TextLabel", contentContainer)
+creditLabel.Size = UDim2.new(1, 0, 0, 15)
+creditLabel.Position = UDim2.new(0, 0, 1, -15)
+creditLabel.BackgroundTransparency = 1
+creditLabel.Text = "Engine: DYTON_txt & Josep Bart"
+creditLabel.TextColor3 = Color3.fromRGB(150, 0, 0)
+creditLabel.Font = Enum.Font.Code
+creditLabel.TextSize = 9
+
+camoBtn.MouseButton1Click:Connect(function()
+    camouflageActive = not camouflageActive
+    if camouflageActive then
+        camoBtn.Text = "SKILL KAMUFLASE: ON"
+        camoBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
+        camoBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    else
+        camoBtn.Text = "SKILL KAMUFLASE: OFF"
+        camoBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        camoBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    end
+end)
+
+local VisibleParts = {}
+local function SetupCharacter()
+    local char = LP.Character or LP.CharacterAdded:Wait()
+    VisibleParts = {}
+    for _, d in pairs(char:GetDescendants()) do
+        if (d:IsA("BasePart") or d:IsA("Decal")) and d.Name ~= "HumanoidRootPart" then
+            table.insert(VisibleParts, d)
+        end
+    end
+end
+
+local function restoreNaturalCollision(char)
+    if not char then return end
+    for _, v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            local name = v.Name:lower()
+            v.CanCollide = (name:find("torso") or name:find("root") or name:find("leg") or name:find("head")) and not noclip
+        end
+    end
+end
+
+local function ToggleInvis()
+    IsInvisible = not IsInvisible
+    invBtn.Text = IsInvisible and "INVISIBLE: ON" or "INVISIBLE: OFF"
+    invBtn.TextColor3 = IsInvisible and Color3.fromRGB(255, 30, 30) or Color3.new(0.8, 0.8, 0.8)
+    
+    local targetTransparency = IsInvisible and 1 or 0
+    for _, part in pairs(VisibleParts) do
+        if part and part.Parent then pcall(function() part.Transparency = targetTransparency end) end
+    end
+end
+
+local function ActionToggleAirWalk()
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    AirWalkActive = not AirWalkActive
+    if AirWalkActive then
+        airWalkBtn.Text = "Air Walk: ON"
+        airWalkBtn.TextColor3 = Color3.fromRGB(255, 30, 30)
+        Platform.CanCollide = true
+        UpdateGroundY()
+        if root then
+            SmoothHeight = CurrentGroundY + TargetHeight
+            local rx, ry, rz = root.CFrame:ToOrientation()
+            LastValidYaw = ry
+            root.CFrame = CFrame.new(root.Position.X, SmoothHeight, root.Position.Z) * CFrame.Angles(0, LastValidYaw, 0)
+        end
+    else
+        airWalkBtn.Text = "Air Walk: OFF"
+        airWalkBtn.TextColor3 = Color3.new(0.85, 0.8, 0.8)
+        Platform.CanCollide = false
+        Platform.Position = Vector3.new(0, -999, 0)
+    end
+end
+
+bBite.MouseButton1Click:Connect(function()
+    if isBiting or isSkilling or isEmoting then return end
+    isBiting = true
+    bBite.Text = "BITING..."
+    
+    task.spawn(function()
+        isBitingState = 1
+        task.wait(1.5)
+        isBitingState = 2
+        task.wait(1.0)
+        
+        isBitingState = 0
+        isBiting = false
+        bBite.Text = "kill them and eat!"
+    end)
+end)
+
+bSkill.MouseButton1Click:Connect(function()
+    if isSkilling or isBiting or isEmoting then return end
+    isSkilling = true
+    bSkill.Text = "SKILLING..."
+    
+    task.spawn(function()
+        isSkillState = 1
+        task.wait(1.0)
+        isSkillState = 2
+        task.wait(1.2)
+        
+        isSkillState = 0
+        isSkilling = false
+        bSkill.Text = "HAHA GOT YOU"
+    end)
+end)
+
+-- [[ OPTIMIZED EMOTE SEQUENCE: EMOTE 1 -> EMOTE 2 WITH LIGHT VIBRATION ]] --
+bEmote.MouseButton1Click:Connect(function()
+    if isEmoting or isBiting or isSkilling then return end
+    isEmoting = true
+    bEmote.Text = "EMOTING..."
+    
+    task.spawn(function()
+        isEmoteState = 1
+        task.wait(2.5) -- Waktu Emote 1 berjalan
+        
+        isEmoteState = 2 -- Lanjut ke Emote 2 (Efek getaran tipis otomatis aktif)
+        task.wait(2.5) -- Berteriak + bergetar sampai Emote 2 selesai
+        
+        isEmoteState = 0
+        isEmoting = false
+        bEmote.Text = "ROARR"
+    end)
+end)
+
+SummonBtn.MouseButton1Click:Connect(function()
+    petMode = not petMode
+    if petMode then
+        SetupCharacter()
+        noclip, snapNextFrame = true, true
+        cBtn.Text, SummonBtn.TextColor3 = "Noclip: ON", Color3.fromRGB(255, 30, 30)
+        UpdateAndValidateRodanProps()
+        
+        local char = LP.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            lastPosition = char.HumanoidRootPart.Position
+        end
+    else
+        if IsInvisible then ToggleInvis() end
+        if AirWalkActive then ActionToggleAirWalk() end
+        noclip = false
+        cBtn.Text, SummonBtn.TextColor3 = "Noclip: OFF", Color3.new(0.8,0.8,0.8)
+        restoreNaturalCollision(LP.Character)
+        table.clear(CURRENT_CFRAMES)
+        table.clear(TARGET_CFRAMES)
+        table.clear(LAST_SEND_TIME)
+        table.clear(COLOR_SENDING)
+        table.clear(NETWORK_STATE)
+        table.clear(LAST_SCALE_CACHE)
+        table.clear(SCALE_SENDING)
+        table.clear(TEXTURE_APPLIED)
+        table.clear(PROP_COLOR_CACHE)
+    end
+end)
+
+cBtn.MouseButton1Click:Connect(function() noclip = not noclip cBtn.Text = noclip and "Noclip: ON" or "Noclip: OFF" restoreNaturalCollision(LP.Character) end)
+airWalkBtn.MouseButton1Click:Connect(ActionToggleAirWalk)
+invBtn.MouseButton1Click:Connect(ToggleInvis)
+
+bReload.MouseButton1Click:Connect(function()
+    isReloading = not isReloading
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local detectorPath = workspace.WorkspaceCom["001_CriminalWeapons"].GiveTools.Bomb.ClickDetector
+
+    if isReloading then
+        bReload.Text = "STOP & TP BACK"
+        bReload.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        bReload.TextColor3 = Color3.new(1, 1, 1)
+        if root then originalPos = root.CFrame root.CFrame = detectorPath.Parent.CFrame end
+        task.spawn(function()
+            while isReloading do
+                pcall(function() fireclickdetector(detectorPath) end)
+                task.wait(0.05)
+            end
+        end)
+    else
+        bReload.Text = "SKILL TP + DUPE BOMB"
+        bReload.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+        bReload.TextColor3 = Color3.fromRGB(255, 30, 30)
+        if root and originalPos then root.CFrame = originalPos originalPos = nil end
+    end
+end)
+
+bEquip.MouseButton1Click:Connect(function() for _, v in pairs(LP.Backpack:GetChildren()) do if v.Name == "Bomb" then v.Parent = LP.Character end end end)
+
+bBlast.MouseButton1Click:Connect(function()
+    local char = LP.Character
+    if not char then return end
+    local bombs = {}
+    for _, v in pairs(LP.Backpack:GetChildren()) do if v.Name == "Bomb" then table.insert(bombs, v) end end
+    for _, v in pairs(char:GetChildren()) do if v.Name == "Bomb" then table.insert(bombs, v) end end
+    if #bombs == 0 then return end
+    for i, bomb in ipairs(bombs) do
+        task.spawn(function() pcall(function() bomb.Parent = char task.wait() bomb:Activate() end) end)
+        if i % 20 == 0 then RS.Heartbeat:Wait() end
+    end
+end)
+
+bDetonate.MouseButton1Click:Connect(function()
+    local args = { "Bomb" .. OwnerName }
+    pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("RE"):WaitForChild("1Blo1wBomb1sServe1r"):FireServer(unpack(args)) end)
+end)
+
+MinBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 220, 0, 30) or UDim2.new(0, 220, 0, 460)
+    MinBtn.Text = isMinimized and "▼" or "▲"
+    TS:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+    contentContainer.Visible = not isMinimized
+end)
+
+task.spawn(function() while true do Counter.Text = "BOMBS COUNTER: " .. getBombCount() task.wait(0.4) end end)
+
+local Connections = {}
+Connections[1] = UIS.InputBegan:Connect(function(input, gameProcessed) 
+    if not gameProcessed then
+        if input.KeyCode == Enum.KeyCode.G then 
+            ToggleInvis() 
+        elseif input.KeyCode == Enum.KeyCode.J then
+            ActionToggleAirWalk()
+        end
+    end 
+end)
+
+-- [[ MAIN LOOP - INTERPOLATION MATRIX & ADAPTIVE LERP ENGINE ]] --
+Connections[2] = RS.Heartbeat:Connect(function(dt)
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChild("Humanoid")
+
+    if IsInvisible and root and hum then
+        local OriginalCFrame = root.CFrame
+        local OriginalCameraOffset = hum.CameraOffset
+        local DownCFrame = OriginalCFrame * CFrame.new(0, -500000, 0)
+        root.CFrame = DownCFrame
+        hum.CameraOffset = DownCFrame:ToObjectSpace(CFrame.new(OriginalCFrame.Position)).Position
+        RS.RenderStepped:Wait()
+        root.CFrame = OriginalCFrame
+        hum.CameraOffset = OriginalCameraOffset
+    end
+
+    if petMode then
+        local t = tick()
+        if t % 0.5 < dt then UpdateAndValidateRodanProps() end
+
+        local totalRegisteredProps = TOTAL_MAX_PROPS 
+        
+        if root then
+            local VirtualRootCFrame = root.CFrame
+            local currentPos = VirtualRootCFrame.Position
+            local calculatedVelocity = (currentPos - lastPosition) / math.max(dt, 0.001)
+            lastPosition = currentPos
+
+            local moveSpeed = calculatedVelocity.Magnitude
+            local isWalking = moveSpeed > 1
+            
+            local activeConfig = Config.Idle
+            local lerpSpeed = 6.5
+
+            if isBiting then
+                activeConfig = Config.Bite
+                lerpSpeed = 5.0
+            elseif isSkilling then
+                activeConfig = Config.Skill
+                lerpSpeed = 4.0
+            elseif isEmoting then
+                activeConfig = Config.Emote
+                lerpSpeed = 4.0
+            elseif isWalking then
+                activeConfig = Config.Walk
+                lerpSpeed = 10.5
+            end
+            
+            local baseAlpha = math.clamp(1 - math.exp(-lerpSpeed * dt), 0, 1)
+            local localLerpAlpha = math.pow(baseAlpha, 0.75) 
+
+            if estimatedPing > 0.15 then
+                NETWORK_TICK_RATE = math.clamp(estimatedPing * 0.5, BASE_TICK_RATE, 0.8)
+            else
+                NETWORK_TICK_RATE = BASE_TICK_RATE
+            end
+
+            local safePing = math.clamp(estimatedPing, 0.01, 0.2)
+            local predictedPosition = currentPos + (calculatedVelocity * safePing)
+            
+            local baseTargetCF = CFrame.new(predictedPosition, predictedPosition + VirtualRootCFrame.LookVector)
+            local finalPos = baseTargetCF * CFrame.new(activeConfig.Offset.X, activeConfig.Offset.Y, activeConfig.Offset.Z)
+            local rotCF = CFrame.Angles(math.rad(activeConfig.Rotation.X), math.rad(activeConfig.Rotation.Y), math.rad(activeConfig.Rotation.Z))
+
+            if snapNextFrame then localLerpAlpha = 1 end
+
+            -- PERBAIKAN LOGIKA CYCLE WALK
+            local walkAnimSpeed = 0.27
+            local cycle = (t * walkAnimSpeed) % 1.0
+
+            for id = 1, totalRegisteredProps do
+                local prop = PROP_CACHE[id]
+                if prop and prop.Parent then
+                    local rawEntry
+                    
+                    if isBiting then
+                        if isBitingState == 1 then
+                            rawEntry = AnimationPool.Bite1[id] or AnimationPool.Idle[id]
+                        elseif isBitingState == 2 then
+                            rawEntry = AnimationPool.Bite2[id] or AnimationPool.Bite1[id]
+                        else
+                            rawEntry = AnimationPool.Idle[id]
+                        end
+                    elseif isSkilling then
+                        if isSkillState == 1 then
+                            rawEntry = AnimationPool.Skill1[id] or AnimationPool.Idle[id]
+                        elseif isSkillState == 2 then
+                            rawEntry = AnimationPool.Skill2[id] or AnimationPool.Skill1[id]
+                        else
+                            rawEntry = AnimationPool.Idle[id]
+                        end
+                    elseif isEmoting then
+                        if isEmoteState == 1 then
+                            rawEntry = AnimationPool.Emote1[id] or AnimationPool.Idle[id]
+                        elseif isEmoteState == 2 then
+                            rawEntry = AnimationPool.Emote2[id] or AnimationPool.Emote1[id]
+                        else
+                            rawEntry = AnimationPool.Idle[id]
+                        end
+                    elseif isWalking then
+                        local raw_w1  = AnimationPool.Walk1[id]      or AnimationPool.Idle[id]
+                        local raw_w1c = AnimationPool.Walk1combo[id] or raw_w1
+                        local raw_w2  = AnimationPool.Walk2[id]      or AnimationPool.Idle[id]
+                        local raw_w2c = AnimationPool.Walk2combo[id] or raw_w2
+
+                        local cf_w1  = UnpackMatrixData(raw_w1)
+                        local cf_w1c = UnpackMatrixData(raw_w1c)
+                        local cf_w2  = UnpackMatrixData(raw_w2)
+                        local cf_w2c = UnpackMatrixData(raw_w2c)
+
+                        local mixedOffset
+                        if cycle < 0.25 then
+                            local alpha = cycle / 0.25
+                            mixedOffset = cf_w1:Lerp(cf_w1c, alpha)
+                        elseif cycle < 0.50 then
+                            local alpha = (cycle - 0.25) / 0.25
+                            mixedOffset = cf_w1c:Lerp(cf_w2, alpha)
+                        elseif cycle < 0.75 then
+                            local alpha = (cycle - 0.50) / 0.25
+                            mixedOffset = cf_w2:Lerp(cf_w2c, alpha)
+                        else
+                            local alpha = (cycle - 0.75) / 0.25
+                            mixedOffset = cf_w2c:Lerp(cf_w1, alpha)
+                        end
+                        rawEntry = mixedOffset
+                    else
+                        rawEntry = AnimationPool.Idle[id] or AnimationPool.Idle[((id - 1) % #AnimationPool.Idle) + 1]
+                    end
+
+                    local offsetCF, scaleVal = UnpackMatrixData(rawEntry)
+                    
+                    -- [[ SHAKE ENGINE: Efek getaran tipis saat Emote2 berteriak ]] --
+                    if isEmoting and isEmoteState == 2 then
+                        local vibrateOffset = Vector3.new(
+                            (math.random() - 0.5) * 6,
+                            (math.random() - 0.5) * 6,
+                            (math.random() - 0.5) * 6
+                        )
+                        offsetCF = offsetCF * CFrame.new(vibrateOffset)
+                    end
+
+                    local targetCF = finalPos * rotCF * offsetCF
+                    
+                    TARGET_CFRAMES[id] = targetCF
+
+                    if snapNextFrame or not CURRENT_CFRAMES[id] then
+                        CURRENT_CFRAMES[id] = targetCF
+                    else
+                        CURRENT_CFRAMES[id] = CURRENT_CFRAMES[id]:Lerp(targetCF, localLerpAlpha)
+                    end
+
+                    -- AUTO SCALE INVOKER LOGIC
+                    if scaleVal and LAST_SCALE_CACHE[id] ~= scaleVal and not SCALE_SENDING[id] then
+                        SCALE_SENDING[id] = true
+                        task.spawn(function()
+                            local scaleRemote = prop:FindFirstChild("SetCurrentScale")
+                            if scaleRemote and scaleRemote:IsA("RemoteFunction") then
+                                pcall(function()
+                                    scaleRemote:InvokeServer(scaleVal)
+                                    LAST_SCALE_CACHE[id] = scaleVal
+                                end)
+                            end
+                            SCALE_SENDING[id] = false
+                        end)
+                    end
+                end
+            end
+            if snapNextFrame then snapNextFrame = false end
+
+            local canUpdateColor = (t - lastColorUpdate > 0.015)
+            
+            for id = 1, totalRegisteredProps do
+                local prop = PROP_CACHE[id]
+                if prop and CURRENT_CFRAMES[id] then
+                    -- 1. SEND CFRAME REMOTE ONLY
+                    if t - (LAST_SEND_TIME[id] or 0) >= NETWORK_TICK_RATE and not NETWORK_STATE[id] then
+                        local cfR = prop:FindFirstChild("SetCurrentCFrame")
+                        if cfR and cfR:IsA("RemoteFunction") then
+                            LAST_SEND_TIME[id] = t 
+                            NETWORK_STATE[id] = true 
+                            
+                            task.spawn(function()
+                                local startSend = os.clock()
+                                local completed = false
+                                
+                                task.spawn(function()
+                                    local success = pcall(function() 
+                                        cfR:InvokeServer(CURRENT_CFRAMES[id]) 
+                                    end)
+                                    completed = true
+                                    NETWORK_STATE[id] = false 
+                                    
+                                    if success and id == 1 then
+                                        estimatedPing = (estimatedPing * 0.95) + ((os.clock() - startSend) * 0.05)
+                                    end
+                                end)
+                                
+                                task.delay(MAX_CHOKE_TIMEOUT, function()
+                                    if not completed then NETWORK_STATE[id] = false end
+                                end)
+                            end)
+                        end
+                    end
+
+                    -- 2. SEND DYNAMIC COLOR REMOTE (MULTI-DIRECTIONAL SCANNER)
+                    if canUpdateColor and id == colorIndex and not COLOR_SENDING[id] then
+                        local crR = prop:FindFirstChild("ChangePropColor")
+                        if crR then
+                            COLOR_SENDING[id] = true
+                            task.spawn(function()
+                                local finishedColor = false
+                                local scannedColor = GetPropScannedColor(id, prop)
+                                task.spawn(function()
+                                    pcall(function() 
+                                        crR:InvokeServer(scannedColor) 
+                                    end)
+                                    finishedColor = true
+                                    COLOR_SENDING[id] = false
+                                end)
+                                task.delay(0.1, function() if not finishedColor then COLOR_SENDING[id] = false end end)
+                            end)
+                        end
+                    end
+                end
+            end
+            
+            if canUpdateColor then
+                colorIndex = (colorIndex % totalRegisteredProps) + 1
+                lastColorUpdate = t
+            end
+        end
+    end
+
+    -- [[ STABILIZED AIR WALK ENGINE ]] --
+    if AirWalkActive and root then
+        UpdateGroundY()
+        local actualTarget = CurrentGroundY + TargetHeight
+        SmoothHeight = SmoothHeight + (actualTarget - SmoothHeight) * 0.15
+        
+        Platform.Position = Vector3.new(root.Position.X, SmoothHeight - 3.5, root.Position.Z)
+        
+        local lookVector = root.CFrame.LookVector
+        local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z)
+        if flatLook.Magnitude > 0.001 then
+            LastValidYaw = math.atan2(-flatLook.X, -flatLook.Z)
+        end
+        
+        if math.abs(root.Position.Y - SmoothHeight) > 0.1 then
+            root.CFrame = CFrame.new(root.Position.X, SmoothHeight, root.Position.Z) * CFrame.Angles(0, LastValidYaw, 0)
+        end
+    end
+end)
+
+Connections[3] = RS.Heartbeat:Connect(function()
+    local char = LP.Character
+    if noclip and char then 
+        for _, v in pairs(char:GetDescendants()) do 
+            if v:IsA("BasePart") then v.CanCollide = false end 
+        end 
+    end
+end)
+
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    IsInvisible, isReloading, AirWalkActive, isBiting, isSkilling, isEmoting, camouflageActive = false, false, false, false, false, false, false
+    Platform.CanCollide = false
+    Platform.Position = Vector3.new(0, -999, 0)
+end)
+
+    
+end
+
+RunMainScript()
