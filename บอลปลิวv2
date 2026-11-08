@@ -1,0 +1,317 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+if player.PlayerGui:FindFirstChild("WitherBall_UI_V1") then
+    player.PlayerGui.WitherBall_UI_V1:Destroy()
+end
+if player.PlayerGui:FindFirstChild("WitherBall_UI_V2") then
+    player.PlayerGui.WitherBall_UI_V2:Destroy()
+end
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "WitherBall_UI_V2"
+Gui.ResetOnSpawn = false
+Gui.Parent = player:WaitForChild("PlayerGui")
+
+local ToggleBtn = Instance.new("TextButton", Gui)
+ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
+ToggleBtn.Position = UDim2.new(0, 20, 0.5, -20)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+ToggleBtn.Text = "P"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 20
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
+
+local BtnStroke = Instance.new("UIStroke", ToggleBtn)
+BtnStroke.Color = Color3.fromRGB(180, 0, 255)
+BtnStroke.Thickness = 2
+
+local Main = Instance.new("Frame", Gui)
+Main.Size = UDim2.new(0, 240, 0, 213)
+Main.Position = UDim2.new(0.5, -120, 0.5, -126)
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Main.Active = true
+Main.Draggable = true
+Main.Visible = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(100, 0, 180)
+MainStroke.Thickness = 1.5
+
+local isMenuOpen = true
+ToggleBtn.MouseButton1Click:Connect(function()
+    isMenuOpen = not isMenuOpen
+    Main.Visible = isMenuOpen
+end)
+
+local UIList = Instance.new("UIListLayout", Main)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 7)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local UIPadding = Instance.new("UIPadding", Main)
+UIPadding.PaddingTop = UDim.new(0, 10)
+UIPadding.PaddingBottom = UDim.new(0, 10)
+UIPadding.PaddingLeft = UDim.new(0, 10)
+UIPadding.PaddingRight = UDim.new(0, 10)
+
+local Title = Instance.new("TextLabel", Main)
+Title.LayoutOrder = 1
+Title.Size = UDim2.new(1, 0, 0, 22)
+Title.BackgroundTransparency = 1
+Title.Text = "บอลปลิว v2 | โดย P9D"
+Title.TextColor3 = Color3.fromRGB(180, 220, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+
+local Box = Instance.new("TextBox", Main)
+Box.LayoutOrder = 2
+Box.Size = UDim2.new(1, 0, 0, 30)
+Box.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+Box.PlaceholderText = "ชื่อผู้เล่น"
+Box.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+Box.Text = ""
+Box.TextColor3 = Color3.fromRGB(255, 255, 255)
+Box.Font = Enum.Font.Gotham
+Box.TextSize = 12
+Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 6)
+
+local Button = Instance.new("TextButton", Main)
+Button.LayoutOrder = 3
+Button.Size = UDim2.new(1, 0, 0, 32)
+Button.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+Button.Text = "โจมตี: ปิด"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.Font = Enum.Font.GothamBold
+Button.TextSize = 13
+Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 6)
+
+local RampageButton = Instance.new("TextButton", Main)
+RampageButton.LayoutOrder = 4
+RampageButton.Size = UDim2.new(1, 0, 0, 32)
+RampageButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+RampageButton.Text = "โจมตีทุกคน: ปิด"
+RampageButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RampageButton.Font = Enum.Font.GothamBold
+RampageButton.TextSize = 13
+Instance.new("UICorner", RampageButton).CornerRadius = UDim.new(0, 6)
+
+local StatusLabel = Instance.new("TextLabel", Main)
+StatusLabel.LayoutOrder = 6
+StatusLabel.Size = UDim2.new(1, 0, 0, 18)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Status: พร้อมใช้งาน"
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.Font = Enum.Font.Code
+StatusLabel.TextSize = 10
+
+local petMode = false
+local rampageMode = false
+local TargetPlayer = nil
+local hasFetchedBall = false
+
+local SWITCH_INTERVAL = 1.2
+local lastSwitch = 0
+
+local cachedBall = nil
+local lastBallCheck = 0
+
+local function GetBallSilent()
+    local t = tick()
+    if cachedBall and not cachedBall.Parent then cachedBall = nil end
+    if t - lastBallCheck < 0.5 then return cachedBall end
+    lastBallCheck = t
+
+    local b = player.Backpack:FindFirstChild("SoccerBall") or (player.Character and player.Character:FindFirstChild("SoccerBall"))
+    if not b and not hasFetchedBall then
+        hasFetchedBall = true
+        pcall(function()
+            game:GetService("ReplicatedStorage").RE:FindFirstChild("1Too1l"):InvokeServer("PickingTools", "SoccerBall")
+        end)
+    end
+
+    local ballsFolder = Workspace:FindFirstChild("WorkspaceCom") and Workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls")
+    if ballsFolder then
+        local ball = ballsFolder:FindFirstChild("Soccer" .. player.Name)
+        if ball then
+            ball.CanCollide = false
+            cachedBall = ball
+            return ball
+        end
+    end
+    cachedBall = nil
+    return nil
+end
+
+local function getTargetTorso(plr)
+    if not plr or not plr.Parent or not plr.Character then return nil end
+    local char = plr.Character
+    return char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")
+end
+
+local function FindNearestPrey()
+    local nearestPlayer = nil
+    local shortestDistance = 400
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = char.HumanoidRootPart.Position
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 and not hum.Sit then
+                local torso = getTargetTorso(p)
+                if torso then
+                    local dist = (myPos - torso.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        nearestPlayer = p
+                    end
+                end
+            end
+        end
+    end
+    return nearestPlayer
+end
+
+local function getAttackablePlayers()
+	local list = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= player and p.Character then
+			local hum = p.Character:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 and not hum.Sit and getTargetTorso(p) then
+				table.insert(list, p)
+			end
+		end
+	end
+	return list
+end
+
+RunService.Heartbeat:Connect(function(dt)
+    if not petMode then return end
+    local activeBall = GetBallSilent()
+
+    local enemyTorso = TargetPlayer and getTargetTorso(TargetPlayer) or nil
+
+    if rampageMode and (not TargetPlayer or not enemyTorso or tick() - lastSwitch >= SWITCH_INTERVAL) then
+        lastSwitch = tick()
+        local list = getAttackablePlayers()
+        if #list > 0 then
+            local idx = 0
+            for i, p in ipairs(list) do
+                if p == TargetPlayer then idx = i break end
+            end
+            TargetPlayer = list[(idx % #list) + 1]
+            enemyTorso = getTargetTorso(TargetPlayer)
+            Box.Text = "กำลังโจมตี: " .. TargetPlayer.DisplayName
+        else
+            TargetPlayer = nil
+            enemyTorso = nil
+            Box.Text = "[กำลังโจมตี: ไม่มีเป้า]"
+        end
+    end
+
+    if enemyTorso then
+        StatusLabel.Text = "กำลังโจมตี: " .. TargetPlayer.Name
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+
+        local enemyVelocity = enemyTorso.AssemblyLinearVelocity
+        local flatVel = Vector3.new(enemyVelocity.X, 0, enemyVelocity.Z)
+        local speed = flatVel.Magnitude
+        local leadDistance = speed > 15 and 14 or 4
+
+        local interceptPos = enemyTorso.Position
+        if speed > 0.1 then
+            interceptPos = enemyTorso.Position + (flatVel.Unit * leadDistance)
+        end
+
+        if activeBall then
+            activeBall.CFrame = CFrame.new(interceptPos)
+            activeBall.Velocity = Vector3.new(0, 9e10, 0)
+        end
+    else
+
+        if TargetPlayer then
+            StatusLabel.Text = "ล็อกเป้าไว้: " .. TargetPlayer.Name .. " (รอตัวละครพร้อม...)"
+        else
+            StatusLabel.Text = "สถานะ: รอเลือกเป้าหมาย..."
+        end
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+    end
+end)
+
+Button.MouseButton1Click:Connect(function()
+    petMode = not petMode
+    if petMode then
+        Button.Text = "โจมตี: เปิด"
+        Button.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+        hasFetchedBall = false
+        cachedBall = nil
+        lastBallCheck = 0
+    else
+        Button.Text = "โจมตี: ปิด"
+        Button.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        rampageMode = false
+        RampageButton.Text = "โจมตีทุกคน: ปิด"
+        RampageButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+
+    end
+end)
+
+Box.FocusLost:Connect(function(enter)
+    if enter then
+        local searchKey = Box.Text:lower()
+        if searchKey == "" then
+            TargetPlayer = nil
+            Box.Text = ""
+            return
+        end
+        local found = false
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower():find(searchKey) or p.DisplayName:lower():find(searchKey) then
+                TargetPlayer = p
+                Box.Text = p.DisplayName
+                found = true
+                break
+            end
+        end
+        if not found then
+
+            if TargetPlayer then
+                Box.Text = TargetPlayer.DisplayName
+            else
+                Box.Text = "[ไม่พบผู้เล่น]"
+                task.wait(1)
+                Box.Text = ""
+            end
+        end
+    end
+end)
+
+RampageButton.MouseButton1Click:Connect(function()
+    if not petMode then return end
+    rampageMode = not rampageMode
+    if rampageMode then
+        RampageButton.Text = "โจมตีทุกคน: เปิด"
+        RampageButton.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+        lastSwitch = 0
+    else
+        RampageButton.Text = "โจมตีทุกคน: ปิด"
+        RampageButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+
+    end
+end)
+
+Gui.Destroying:Connect(function()
+    petMode = false
+end)
+
+print("Wither Ball v6 Loaded - ดักหน้าตายตัว: เดิน 4 / วิ่ง 14 (เคลื่อนที่ไว >15 ถือเป็นวิ่ง)")
