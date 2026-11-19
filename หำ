@@ -1,0 +1,170 @@
+local P,W,R,T,UIS=game:GetService("Players"),game:GetService("Workspace"),game:GetService("RunService"),game:GetService("TweenService"),game:GetService("UserInputService")
+
+-- เคลียร์ Connection เก่าทั้งหมดเพื่อป้องกันอาการค้างจากการรันซ้ำ
+if getgenv().PropConns then
+	for _, conn in ipairs(getgenv().PropConns) do
+		pcall(function() conn:Disconnect() end)
+	end
+end
+getgenv().PropConns = {}
+local function track(conn)
+	table.insert(getgenv().PropConns, conn)
+	return conn
+end
+
+local lp,pGui,isA,isP,isS,rem,cfSt,tm,rp,targetPlayer=P.LocalPlayer,P.LocalPlayer:WaitForChild("PlayerGui"),false,false,false,{},{},0,RaycastParams.new(),nil
+rp.FilterType,rp.IgnoreWater=Enum.RaycastFilterType.Exclude,true
+local cones=W:WaitForChild("WorkspaceCom",5)and W.WorkspaceCom:WaitForChild("001_TrafficCones",5)
+local C1,C2,RH=Color3.new(1,.75,.8),Color3.fromRGB(198,145,109),CFrame.Angles(0,math.rad(90),0)
+
+local function upP(col)
+	table.clear(rem);table.clear(cfSt)
+	if not cones then return end
+	local t={}
+	for _,v in ipairs(cones:GetChildren())do 
+		if(v:IsA("Model")or v:IsA("BasePart"))and v.Name:find(lp.Name)and v:FindFirstChild("SetCurrentCFrame")then 
+			table.insert(t,v)
+			table.insert(rem,v.SetCurrentCFrame)
+		end 
+	end
+	for i,p in ipairs(t)do 
+		task.spawn(pcall,function()
+			p.ChangePropColor:InvokeServer(col or(i==#t and#t>0 and C1 or C2))
+		end) 
+	end
+end
+
+if pGui:FindFirstChild("PropSafeLeftGui")then pGui.PropSafeLeftGui:Destroy()end
+local sg=Instance.new("ScreenGui",pGui);sg.Name="PropSafeLeftGui";sg.ResetOnSpawn=false
+local pan=Instance.new("Frame",sg);pan.Size,pan.Position,pan.BackgroundColor3,pan.BorderSizePixel=UDim2.new(0,160,0,184),UDim2.new(0,30,.5,-92),Color3.fromRGB(30,30,30),0
+Instance.new("UICorner",pan).CornerRadius=UDim.new(0,8)
+
+-- ระบบลากหน้าจอ UI แบบป้องกันการค้าง
+local dragging,dragInput,dragStart,startPos
+track(pan.InputBegan:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+		dragging=true;dragStart=input.Position;startPos=pan.Position
+		track(input.Changed:Connect(function()if input.UserInputState==Enum.UserInputState.End then dragging=false end end))
+	end
+end))
+track(pan.InputChanged:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then dragInput=input end
+end))
+track(UIS.InputChanged:Connect(function(input)
+	if input==dragInput and dragging then
+		local delta=input.Position-dragStart
+		pan.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+	end
+end))
+
+-- หัวข้อพร้อมไอคอน P
+local pIcon=Instance.new("TextLabel",pan)
+pIcon.Size,pIcon.Position,pIcon.BackgroundColor3,pIcon.TextColor3,pIcon.TextSize,pIcon.Font,pIcon.Text,pIcon.BorderSizePixel=UDim2.new(0,26,0,24),UDim2.new(0,8,0,6),Color3.fromRGB(50,50,50),Color3.fromRGB(255,170,0),14,Enum.Font.SourceSansBold,"P",0
+Instance.new("UICorner",pIcon).CornerRadius=UDim.new(0,4)
+
+local titleLbl=Instance.new("TextLabel",pan)
+titleLbl.Size,titleLbl.Position,titleLbl.BackgroundTransparency,titleLbl.TextColor3,titleLbl.TextSize,titleLbl.Font,titleLbl.Text,titleLbl.BorderSizePixel=UDim2.new(0,110,0,24),UDim2.new(0,40,0,6),1,Color3.new(1,1,1),12,Enum.Font.SourceSansBold,"Prop Control",0
+titleLbl.TextXAlignment=Enum.TextXAlignment.Left
+
+local function mB(y,txt)
+	local b,s=Instance.new("TextButton",pan),Instance.new("UIStroke")
+	b.Size,b.Position,b.BackgroundColor3,b.TextColor3,b.TextSize,b.Font,b.Text,b.BorderSizePixel=UDim2.new(0,144,0,32),UDim2.new(.5,-72,0,y),Color3.fromRGB(45,45,45),Color3.new(1,1,1),13,Enum.Font.SourceSansBold,txt,0
+	Instance.new("UICorner",b).CornerRadius=UDim.new(0,6);s.Parent,s.Color,s.Thickness=b,Color3.fromRGB(230,50,50),2
+	return b,s
+end
+
+local bA,sA=mB(36,"AUTO: OFF")
+local bP,sP=mB(72,"PULSE: OFF")
+local bS,sS=mB(108,"AUTO (): OFF")
+
+-- ช่องใส่ชื่อเป้าหมาย (TextBox)
+local tBox=Instance.new("TextBox",pan)
+tBox.Size,tBox.Position,tBox.BackgroundColor3,tBox.TextColor3,tBox.PlaceholderColor3=UDim2.new(0,144,0,32),UDim2.new(.5,-72,0,144),Color3.fromRGB(40,40,40),Color3.new(1,1,1),Color3.fromRGB(150,150,150)
+tBox.TextSize,tBox.Font,tBox.PlaceholderText,tBox.Text,tBox.BorderSizePixel=13,Enum.Font.SourceSansBold,"Target Name...", "",0
+Instance.new("UICorner",tBox).CornerRadius=UDim.new(0,6)
+local tStroke=Instance.new("UIStroke",tBox);tStroke.Color,tStroke.Thickness=Color3.fromRGB(100,100,100),2
+
+local function findPlayer(name)
+	if not name or name=="" then return nil end
+	name=name:lower()
+	for _,plr in ipairs(P:GetPlayers())do
+		if plr~=lp and (plr.Name:lower():sub(1,#name)==name or (plr.DisplayName and plr.DisplayName:lower():sub(1,#name)==name)) then
+			return plr
+		end
+	end
+	return nil
+end
+
+-- คลิกที่ช่องซ้ำ เพื่อเคลียร์ชื่อและรีเซ็ตเป้าหมายกลับมาที่ตัวเรา
+track(tBox.Focused:Connect(function()
+	if targetPlayer~=nil or tBox.Text~="" then
+		targetPlayer=nil
+		tBox.Text=""
+	end
+end))
+
+-- กด Enter (ตกลง) เพื่อยืนยันเปลี่ยนเป้าหมาย
+track(tBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local txt=tBox.Text
+		if txt=="" then
+			targetPlayer=nil
+		else
+			local found=findPlayer(txt)
+			if found then
+				targetPlayer=found
+				tBox.Text=found.Name
+			else
+				targetPlayer=nil
+				tBox.Text="[Not Found]"
+				task.wait(1)
+				if targetPlayer==nil then tBox.Text="" end
+			end
+		end
+	end
+end))
+
+local function sV(b,s,st,t,cO,cS)
+	b.Text=t..(st and"ON"or"OFF")
+	T:Create(b,TweenInfo.new(.25),{BackgroundColor3=st and cO or Color3.fromRGB(45,45,45)}):Play()
+	T:Create(s,TweenInfo.new(.25),{Color=st and cS or Color3.fromRGB(230,50,50)}):Play()
+end
+
+track(bA.MouseButton1Click:Connect(function()isA=not isA;if isA then isS=false;sV(bS,sS,false,"AUTO (): ",Color3.fromRGB(140,40,160),Color3.fromRGB(220,100,255))end;sV(bA,sA,isA,"AUTO: ",Color3.fromRGB(15,130,60),Color3.fromRGB(50,230,100));if isA then upP()end end))
+track(bP.MouseButton1Click:Connect(function()isP=not isP;sV(bP,sP,isP,"PULSE: ",Color3.fromRGB(180,100,20),Color3.fromRGB(255,170,0))end))
+track(bS.MouseButton1Click:Connect(function()isS=not isS;if isS then isA=false;sV(bA,sA,false,"AUTO: ",Color3.fromRGB(15,130,60),Color3.fromRGB(50,230,100))end;sV(bS,sS,isS,"AUTO (): ",Color3.fromRGB(140,40,160),Color3.fromRGB(220,100,255));if isS then upP(C2)end end))
+
+upP()
+
+track(R.Heartbeat:Connect(function(dt)
+	if not(isA or isS)then return end
+	tm=tm+dt;if tm<.033 then return end;tm=0
+	local currentTarget = targetPlayer or lp
+	local c,tot=currentTarget.Character, #rem
+	local hrp=c and c:FindFirstChild("HumanoidRootPart")
+	if not hrp or tot==0 then return end
+	rp.FilterDescendantsInstances={c,W:FindFirstChild("WorkspaceCom")}
+	if isS then
+		local h,e=math.ceil(tot/2),1+.35*math.sin(tick()*8)
+		for i,r in ipairs(rem)do if r and r.Parent and r.Parent.Parent then
+			local isL,sub=i<=h,i<=h and i or(i-h);local mS=isL and h or(tot-h)
+			local a=((mS>1 and(sub-1)/(mS-1)or.5)-.5)*math.pi
+			local wp=hrp.CFrame:PointToWorldSpace(Vector3.new((1.2*e+math.cos(a)*2.2*e)*(isL and -1 or 1),math.sin(a)*(mS*1.1),-4))
+			task.spawn(pcall,function()r:InvokeServer(CFrame.new(wp,wp+hrp.CFrame.LookVector))end)
+		end end
+	else
+		local pS=isP and(.55+.45*math.sin(tick()*12))or 1
+		for i,r in ipairs(rem)do if r and r.Parent and r.Parent.Parent then
+			local cf
+			if i<=2 and tot>=3 then local wp=hrp.CFrame:PointToWorldSpace(Vector3.new((i==2 and 1 or -1)*2.5,-.5,-5));cf=CFrame.new(wp,wp+hrp.CFrame.LookVector)*RH;cfSt[i]=cf
+			else
+				local ai=i-2;local bP=hrp.CFrame:PointToWorldSpace(Vector3.new(0,-math.pow(ai*.35,1.3)*pS,-5-(ai-1)*2*pS))
+				local ry=W:Raycast(bP+Vector3.new(0,10,0),Vector3.new(0,-20,0),rp)
+				local fP=(ry and bP.Y<ry.Position.Y+1.2)and Vector3.new(bP.X,ry.Position.Y+1.2,bP.Z)or bP
+				local raw=CFrame.new(fP,fP+hrp.CFrame.LookVector)*RH
+				cfSt[i]=cfSt[i]and cfSt[i]:Lerp(raw,isP and.5 or math.clamp(.45-ai*.04,.15,.45))or raw;cf=cfSt[i]
+			end
+			if cf then task.spawn(pcall,function()r:InvokeServer(cf)end)end
+		end end
+	end
+end))
