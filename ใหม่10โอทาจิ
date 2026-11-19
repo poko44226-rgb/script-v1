@@ -1,0 +1,1262 @@
+--[[
+    NIGHTMARE THE KING OF OTACHI — DYNAMIC BODY CHAIN V2
+    Engine base : Titanus Tiamat (Veyton.LSP)  x  BY SANDBOX_txt
+
+    PERUBAHAN:
+    1. Body chain NYAMBUNG: tiap ruas jaraknya dikunci persis (rigid link), ga bisa renggang
+    2. Saat DIAM ekor bergerak MEMUTAR (swirl melingkar), makin ke ujung makin lebar
+    3. PLAYER = posisi BASE P (titik 0 data nempel di player, BASE_OFFSET buat geser)
+    4. KEPALA TIDAK BISA MUTER (HEAD LOCK, bisa di-toggle di menu)
+    5. Dynamic Body Chain  : gerakan kepala diteruskan ruas 1 -> 2 -> 3 -> ... -> ekor
+    6. Advanced Wave       : gelombang merambat kepala -> ekor, amplitudo beda tiap bagian
+    7. Individual Prop     : PropOverride / _G.OtachiProp(idx, {...}) per prop
+    8. Arc-Length Spacing  : jarak antar ruas konstan di sepanjang lengkungan
+    9. Stable Rotation     : rotasi minimal-arc + batas kecepatan putar (ga muter mendadak)
+    10. Adaptive Smoothness: tombol SMOOTH / BALANCED / RESPONSIVE
+    11. Body Section System: Neck / Upper / Mid / Rear / Tail beda karakter
+]]
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+-- ============================================================
+local RS      = game:GetService("RunService")
+local UIS     = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local OwnerName = LP.Name
+
+if _G.__OtachiStop then pcall(_G.__OtachiStop) end
+pcall(function()
+    local old = CoreGui:FindFirstChild("NightmareOtachi")
+    if old then old:Destroy() end
+end)
+
+local alive = true
+local conns = {}
+local function track(c) conns[#conns + 1] = c return c end
+
+-- ============================================================
+-- DATA (45 props)
+-- ============================================================
+local function P(id, sx, sy, sz, px, py, pz, rx, ry, rz)
+    return {
+        id   = id,
+        size = Vector3.new(sx, sy, sz),
+        cf   = CFrame.new(px, py, pz) * CFrame.Angles(rx, ry, rz),
+    }
+end
+
+local D = {
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, -3.11,4.51,-9.8, -0.19,-0.35,1.04),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, 6.71,3.81,-9.53, -0.19,-0.04,1.98),
+    P("ShapeCarRaceStraight", 5.84,0.11,16.05, -59.1,-2.84,262.46, 0.05,-0.22,1.58),
+    P("PillarLarge", 3.51,21.14,3.51, -56.97,-3.8,253.14, -1.76,-0.77,2.83),
+    P("ShapeCarRaceStraight", 7.51,0.14,20.66, -54.23,-2.74,241.62, 0.05,-0.22,1.58),
+    P("PillarLarge", 3.99,24.03,3.99, -51.67,-3.04,229.98, -1.76,-0.77,2.83),
+    P("ShapeCarRaceStraight", 8.3,0.16,22.83, -48.56,-1.91,216.5, 0.05,-0.22,1.58),
+    P("PillarLarge", 4.5,27.07,4.5, -45.85,-1.93,204.08, -1.76,-0.77,2.83),
+    P("ShapeCarRaceStraight", 9.19,0.17,25.26, -41.91,0.51,187.89, 0.05,-0.23,1.58),
+    P("PillarLarge", 5,30.11,5, -38.99,-0.71,174.92, -1.77,-0.77,2.82),
+    P("ShapeCarRaceStraight", 9.98,0.19,27.46, -35.17,1.49,158.48, 0,-0.22,1.57),
+    P("PillarLarge", 5.51,33.14,5.51, -31.66,-0.82,142.84, -1.8,-0.76,2.83),
+    P("ShapeCarRaceStraight", 9.98,0.19,27.46, -27.23,0.72,124.15, 0,-0.23,1.57),
+    P("PillarLarge", 5.75,34.59,5.75, -23.66,-1.21,109.18, -1.81,-0.76,2.82),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, -19.9,1.45,92.91, 0,-0.23,1.57),
+    P("PillarLarge", 6.01,36.18,6.01, -15.33,-1.51,74.18, -1.81,-0.76,2.82),
+    P("LargeArch", 2.5,7.5,37.5, 25.84,16.18,16.66, 1.33,-1.31,-3.11),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, -10.92,1.66,55.05, 0,-0.19,1.57),
+    P("PillarLarge", 6.25,37.63,6.25, -10.23,0.05,36.89, -1.65,-0.67,2.96),
+    P("PillarLarge", 6.25,37.62,6.25, -3.81,0.57,38.37, 1.86,-0.65,0.39),
+    P("LargeArch", 2.1,6.29,31.45, 19.23,12.1,28.56, 1.05,-1.33,2.92),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, -2.94,13.7,-10.94, -0.22,-0.37,2.01),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, 6.01,13.43,-9.71, -0.29,-0.01,1.03),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, -8.99,4.24,26.01, -0.16,-0.34,2.04),
+    P("ShapeCarRaceStraight", 11.66,0.22,32.06, -1.26,4.87,28.52, -0.08,-0.14,1.04),
+    P("PillarLarge", 6.25,37.63,6.25, -2.7,5.16,0.52, -1.67,-0.88,2.86),
+    P("PillarLarge", 6.25,37.63,6.25, 4.56,4.95,2.3, 1.94,-0.77,0.34),
+    P("ShapeMoonWhite", 3.43,4.09,0.48, 7.99,10.27,-21.74, 0.01,-1.39,1.53),
+    P("LargeArch", 2.4,7.21,36.06, -28.62,13.41,17.5, -2.61,-0.94,-0.8),
+    P("ShapeMoonWhite", 3.43,4.09,0.48, 0.93,10,-21.84, -2.73,-0.89,-1.25),
+    P("FenceConcrete", 34.19,6.95,4.79, 3.78,12.4,-10.16, -1.51,0.96,-1.71),
+    P("FenceConcrete", 32.17,6.54,4.5, 2.68,12.84,-13.43, 0.06,1.36,3.07),
+    P("FenceConcrete", 33.9,6.9,4.75, 0.04,12.56,-11.19, 1.06,0.99,2.12),
+    P("FenceConcrete", 37.5,7.63,5.25, 7.24,14.4,-17.76, 1.18,1.34,1.92),
+    P("FenceConcrete", 37.5,7.63,5.25, -0.06,14.33,-19.46, -0.74,1.2,-2.47),
+    P("FenceConcrete", 35.77,7.28,5.01, 6.66,0.69,-9.78, 1.63,-1.38,1.96),
+    P("FenceConcrete", 35.19,7.16,4.93, 1.65,-0.73,-10.23, -2.97,-1.36,-2.84),
+    P("FenceConcrete", 35.48,7.22,4.97, -2.65,0.69,-11.79, -2.43,-1.06,-2.17),
+    P("FurnitureCouchBrown", 14.99,5.05,6.41, 7.19,-1.84,-20.3, 1.21,-1.09,1.65),
+    P("FurnitureCouchBrown", 14.99,5.05,6.41, 0.06,-1.1,-21.65, 0.8,0.65,-1.18),
+    P("LargeArch", 2.5,7.5,37.5, -29.1,17.37,4.5, -2.51,-1.01,-0.72),
+    P("FloorCornerHalf", 15.16,1.06,7.58, 7.87,13.19,-38.07, 1.88,0.07,1.78),
+    P("FloorCornerHalf", 11.27,0.79,5.64, 9.48,16.44,-45.52, 1.88,0.07,1.78),
+    P("FloorCorner2Half", 17.5,2.63,37.5, 4.99,7.61,23.44, 0.27,-0.36,-2.6),
+    P("FloorCorner2Half", 17.5,2.63,37.5, -14.2,5.64,18.96, 0.21,-0.04,-0.39),
+}
+local N = #D
+
+-- warna: semua 82,0,3 kecuali ShapeCarRaceStraight 255,0,10
+local C_BODY = Color3.fromRGB(82, 0, 3)
+local C_RACE = Color3.fromRGB(255, 0, 10)
+local function colorForSlot(i)
+    return (D[i].id == "ShapeCarRaceStraight") and C_RACE or C_BODY
+end
+
+-- ============================================================
+-- STRUKTUR: kepala rigid + ekor rantai (rigid link)
+-- ============================================================
+local ChainOrder = { 18, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3 }  -- dekat kepala -> ujung ekor
+
+local isBody = {}
+for _, i in ipairs(ChainOrder) do isBody[i] = true end
+
+-- titik sambung ekor di badan (tengah 2 pillar belakang), koordinat data (origin = BASE P)
+local rearData = (D[19].cf.Position + D[20].cf.Position) / 2
+
+-- tiap ruas: panjang link + arah keluar (menjauhi kepala) + rotasi data
+local Seg = {}
+do
+    local leader = rearData
+    for n, idx in ipairs(ChainOrder) do
+        local p = D[idx].cf.Position
+        local diff = p - leader
+        Seg[n] = { idx = idx, len = diff.Magnitude, out = diff.Unit, rot = D[idx].cf.Rotation }
+        leader = p
+    end
+end
+local TOTAL_SEG = #Seg
+
+-- ============================================================
+-- CONFIG UMUM
+-- ============================================================
+-- BASE P: titik 0 data = posisi PLAYER. Geser creature relatif ke player di sini.
+local BASE_OFFSET   = Vector3.new(0, 0, 0)
+local HOVER_SWAY    = 0.0      -- goyang naik-turun kecil (0 = player pas di BASE P terus)
+
+local RAMPAGE_RADIUS = 400
+local MAX_STUCK_TIME = 6.0
+local ORBIT_RADIUS   = 45
+local ORBIT_SPEED    = 2.0
+local ORBIT_HEIGHT   = 6
+local CONTROL_SPEED  = 120
+
+local PET_SMOOTH_TIME     = 0.10   -- makin kecil makin nempel ke player
+local RAMPAGE_SMOOTH_TIME = 0.16
+local PET_MAX_SPEED       = 260
+local RAMPAGE_MAX_SPEED   = 240
+
+local sendThreshold = 1 / 30
+local POS_EPS       = 0.03
+local ROT_EPS       = 0.02
+local FORCE_REFRESH = 2.0
+
+-- ============================================================
+-- CONFIG BODY CHAIN / WAVE
+-- ============================================================
+local REST_PULL     = 0.7      -- tarikan balik ke bentuk data saat diam (per detik)
+local SWIRL_AMP     = 0.20     -- sudut maksimal per ruas (radian) di ujung ekor
+local SWIRL_EXP     = 1.1      -- makin besar makin ujung ekor doang yg goyang
+local SWIRL_VERT    = 0.85     -- 1.0 = lingkaran penuh, <1 = elips
+local WAVE_SPEED    = 1.6      -- kecepatan putaran ekor
+local WAVE_FREQ     = 0.38     -- beda fase antar ruas (gelombang merambat ke ekor)
+local MOVE_DAMP     = 0.55     -- seberapa kecil swirl saat bergerak
+local FLING_DURATION = 0.65
+local isFlinging, flingTimer = false, 0
+
+local HEAD_LOCK = true         -- kepala tidak bisa muter
+
+-- ============================================================
+-- BODY SECTION SYSTEM
+-- upTo : batas bagian (0..1 sepanjang rantai)
+-- amp  : kekuatan gelombang | smooth : kelembutan arah (detik) | lag : fase tertinggal
+-- ============================================================
+local SECTIONS = {
+    { name = "Neck",  upTo = 0.12, amp = 0.25, smooth = 0.10, lag = 0.00 },  -- fleksibel
+    { name = "Upper", upTo = 0.30, amp = 0.50, smooth = 0.12, lag = 0.10 },  -- gelombang ringan
+    { name = "Mid",   upTo = 0.58, amp = 1.00, smooth = 0.14, lag = 0.20 },  -- lengkungan utama
+    { name = "Rear",  upTo = 0.80, amp = 0.85, smooth = 0.12, lag = 0.35 },  -- ikut badan
+    { name = "Tail",  upTo = 1.01, amp = 1.60, smooth = 0.18, lag = 0.65 },  -- paling fleksibel
+}
+
+-- ============================================================
+-- INDIVIDUAL PROP CONTROL (key = nomor prop di data D)
+-- pos     = Vector3 geser prop (X kanan, Y atas, Z sepanjang badan)
+-- rot     = Vector3 derajat rotasi tambahan
+-- spacing = pengali jarak ke prop sebelumnya (1 = sesuai data)
+-- wave    = pengali gelombang | delay = tambahan keterlambatan (detik) | scale = ukuran
+-- contoh: [3] = { wave = 1.5, delay = 0.1, scale = 1.0 }
+-- ============================================================
+local PropOverride = {
+    -- [3]  = { wave = 1.3, delay = 0.08 },
+    -- [18] = { pos = Vector3.new(0, 0, 0), spacing = 1 },
+}
+
+local Cfg, SizeScale = {}, {}
+local sizeState = setmetatable({}, { __mode = "k" })
+
+local function refreshConfig()
+    table.clear(SizeScale)
+    for n = 1, TOTAL_SEG do
+        local s = Seg[n]
+        local f = (n - 0.5) / TOTAL_SEG
+        local sec = SECTIONS[#SECTIONS]
+        for _, sc in ipairs(SECTIONS) do
+            if f <= sc.upTo then sec = sc break end
+        end
+        local ov = PropOverride[s.idx] or {}
+        local rv = ov.rot or Vector3.zero
+        Cfg[n] = {
+            sec     = sec.name,
+            amp     = sec.amp * (ov.wave or 1),
+            smooth  = sec.smooth + (ov.delay or 0),
+            lag     = sec.lag,
+            pos     = ov.pos or Vector3.zero,
+            rot     = CFrame.Angles(math.rad(rv.X), math.rad(rv.Y), math.rad(rv.Z)),
+            spacing = ov.spacing or 1,
+            scale   = ov.scale or 1,
+        }
+        if Cfg[n].scale ~= 1 then SizeScale[s.idx] = Cfg[n].scale end
+    end
+    table.clear(sizeState)
+end
+refreshConfig()
+
+_G.OtachiProp = function(idx, t)
+    PropOverride[idx] = t
+    refreshConfig()
+end
+
+-- ============================================================
+-- ADAPTIVE SMOOTHNESS
+-- ============================================================
+local PRESETS = {
+    { name = "SMOOTH",     dir = 7,  rot = 6,  rotMax = 5,  smooth = 1.5, wave = 0.85 },
+    { name = "BALANCED",   dir = 12, rot = 10, rotMax = 9,  smooth = 1.0, wave = 1.00 },
+    { name = "RESPONSIVE", dir = 22, rot = 18, rotMax = 15, smooth = 0.6, wave = 1.10 },
+}
+local presetIdx = 2
+
+-- ============================================================
+-- STATE
+-- ============================================================
+local petMode, rampageMode, isControlling = false, false, false
+local waveOn = true
+local TargetPlayer, lockedTargetPlayer = nil, nil
+local rampageBlacklist = {}
+local targetAttackTrack = { player = nil, startTime = 0, initialPos = Vector3.zero }
+
+local slotProp = {}
+local propSlot = setmetatable({}, { __mode = "k" })
+local curCF, bodyCF = {}, {}
+
+local lastSentCF = setmetatable({}, { __mode = "k" })
+local lastSentT  = setmetatable({}, { __mode = "k" })
+local inFlight   = setmetatable({}, { __mode = "k" })
+local retryAt    = setmetatable({}, { __mode = "k" })
+local colorSent  = setmetatable({}, { __mode = "k" })
+local colorBusy  = setmetatable({}, { __mode = "k" })
+local sizeRemote = setmetatable({}, { __mode = "k" })
+
+-- rantai
+local baseP, baseDir, smDir = {}, {}, {}
+local chainReady = false
+local waveTime, waveStr, speedSm = 0, 1, 0
+
+local LeviathanCurrentPos = Vector3.zero
+local followVel = Vector3.zero
+local lastHeadPos = nil
+local jumpPressed = false
+local lockedRot = CFrame.new()
+local freeRot = CFrame.new()
+
+local LeviathanCore, bodyVel, bodyGyro, flyConnection
+
+local lastPropScanTime, lastValidCheck, lastPreyScanTime = 0, 0, 0
+local lastColorTick, lastSizeTick, lastSendTick = 0, 0, 0
+local nextSendIndex = 1
+
+local COLORS = {
+    Accent       = Color3.fromRGB(255, 60, 70),
+    Good         = Color3.fromRGB(255, 120, 120),
+    WarningRed   = Color3.fromRGB(255, 200, 40),
+    Border       = Color3.fromRGB(120, 12, 20),
+}
+
+-- ============================================================
+-- PROP SCAN (cocok ID + size, slot dikunci)
+-- ============================================================
+local function propInfo(prop)
+    local id = prop:GetAttribute("ID") or prop:GetAttribute("id")
+    local size = (prop:IsA("BasePart") and prop.Size) or (prop:IsA("Model") and prop:GetExtentsSize()) or nil
+    return id, size
+end
+
+local function ScanForProps()
+    local wc = workspace:FindFirstChild("WorkspaceCom")
+    local folder = wc and wc:FindFirstChild("001_TrafficCones")
+    if not folder then return end
+    local mine = "Prop" .. OwnerName
+
+    for i = 1, N do
+        local p = slotProp[i]
+        if p and not p.Parent then
+            slotProp[i] = nil
+            propSlot[p] = nil
+            curCF[i] = nil
+            bodyCF[i] = nil
+        end
+    end
+
+    local fresh = {}
+    for _, v in ipairs(folder:GetChildren()) do
+        if v.Name == mine and not propSlot[v] then fresh[#fresh + 1] = v end
+    end
+    if #fresh == 0 then return end
+
+    for pass = 1, 2 do
+        for _, prop in ipairs(fresh) do
+            if not propSlot[prop] then
+                local id, size = propInfo(prop)
+                if id then
+                    for i = 1, N do
+                        local d = D[i]
+                        if not slotProp[i] and d.id == id
+                            and (pass == 2 or (size and (size - d.size).Magnitude < 0.1)) then
+                            slotProp[i] = prop
+                            propSlot[prop] = i
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- SIZE (remote current size)
+-- ============================================================
+local function findSizeRemote(prop)
+    local r = sizeRemote[prop]
+    if r and r.Parent then return r end
+    r = prop:FindFirstChild("SetCurrentSize") or prop:FindFirstChild("ChangePropSize") or prop:FindFirstChild("SetSize")
+    if not r then
+        for _, c in ipairs(prop:GetChildren()) do
+            if (c:IsA("RemoteFunction") or c:IsA("RemoteEvent")) and c.Name:lower():find("size") then
+                r = c
+                break
+            end
+        end
+    end
+    sizeRemote[prop] = r
+    return r
+end
+
+local function processSizes(now)
+    if now - lastSizeTick < 0.06 then return end
+    lastSizeTick = now
+    local budget = 3
+    for i = 1, N do
+        local prop = slotProp[i]
+        if prop and prop.Parent then
+            local st = sizeState[prop]
+            if not st then
+                st = { ok = false, tries = 0, at = 0 }
+                sizeState[prop] = st
+            end
+            if not st.ok then
+                local want = D[i].size * (SizeScale[i] or 1)
+                local _, cur = propInfo(prop)
+                if cur and (cur - want).Magnitude < 0.15 then
+                    st.ok = true
+                elseif st.tries < 10 and now - st.at > 1.2 then
+                    local r = findSizeRemote(prop)
+                    if r then
+                        st.at = now
+                        st.tries += 1
+                        budget -= 1
+                        task.spawn(function()
+                            pcall(function()
+                                if r:IsA("RemoteFunction") then r:InvokeServer(want) else r:FireServer(want) end
+                            end)
+                        end)
+                        if budget <= 0 then return end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- KIRIM POSISI + WARNA
+-- ============================================================
+local function cfChanged(a, b)
+    if not b then return true end
+    if (a.Position - b.Position).Magnitude > POS_EPS then return true end
+    return (a.LookVector - b.LookVector).Magnitude + (a.UpVector - b.UpVector).Magnitude > ROT_EPS
+end
+
+local function sendProp(prop, cf, now)
+    if inFlight[prop] or (retryAt[prop] and now < retryAt[prop]) then return false end
+    local remote = prop:FindFirstChild("SetCurrentCFrame")
+    if not remote then return false end
+    inFlight[prop] = true
+    task.spawn(function()
+        local ok = pcall(function() remote:InvokeServer(cf) end)
+        inFlight[prop] = nil
+        if ok then
+            lastSentCF[prop] = cf
+            lastSentT[prop] = tick()
+        else
+            retryAt[prop] = tick() + 0.75
+        end
+    end)
+    return true
+end
+
+local function sendPositions(t, have)
+    if t - lastSendTick < sendThreshold then return end
+    lastSendTick = t
+    local batch = math.clamp(math.ceil(have / 2), 12, 30)
+    local sent, checked = 0, 0
+    while sent < batch and checked < N do
+        checked += 1
+        if nextSendIndex > N then nextSendIndex = 1 end
+        local i = nextSendIndex
+        nextSendIndex += 1
+        local prop, cf = slotProp[i], curCF[i]
+        if prop and prop.Parent and cf then
+            if cfChanged(cf, lastSentCF[prop]) or t - (lastSentT[prop] or 0) > FORCE_REFRESH then
+                if sendProp(prop, cf, t) then sent += 1 end
+            end
+        end
+    end
+end
+
+local function sendColors(t)
+    if t - lastColorTick < 0.1 then return end
+    lastColorTick = t
+    local sent = 0
+    for i = 1, N do
+        local prop = slotProp[i]
+        if prop and prop.Parent and sent < 8 then
+            local want = colorForSlot(i)
+            if colorSent[prop] ~= want and not colorBusy[prop] then
+                local rem = prop:FindFirstChild("ChangePropColor")
+                if rem then
+                    colorBusy[prop] = true
+                    sent += 1
+                    task.spawn(function()
+                        local ok = pcall(function() rem:InvokeServer(want) end)
+                        colorBusy[prop] = nil
+                        if ok then colorSent[prop] = want end
+                    end)
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- HELPER MATH
+-- ============================================================
+local function smoothDamp(current, target, velocity, smoothTime, maxSpeed, dt)
+    smoothTime = math.max(0.0001, smoothTime)
+    local omega = 2 / smoothTime
+    local x = omega * dt
+    local e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
+    local change = current - target
+    local origTarget = target
+    local maxChange = maxSpeed * smoothTime
+    if change.Magnitude > maxChange then change = change.Unit * maxChange end
+    target = current - change
+    local temp = (velocity + change * omega) * dt
+    local newVel = (velocity - temp * omega) * e
+    local output = target + (change + temp) * e
+    if (origTarget - current):Dot(output - origTarget) > 0 then
+        output = origTarget
+        newVel = Vector3.zero
+    end
+    return output, newVel
+end
+
+-- rotasi minimal yang membawa arah a ke arah b (stabil, tanpa flip)
+local function arcRot(a, b)
+    local d = a:Dot(b)
+    if d > 0.99999 then return CFrame.new() end
+    if d < -0.99999 then
+        local ax = a:Cross(Vector3.yAxis)
+        if ax.Magnitude < 1e-3 then ax = a:Cross(Vector3.xAxis) end
+        return CFrame.fromAxisAngle(ax.Unit, math.pi)
+    end
+    return CFrame.fromAxisAngle(a:Cross(b).Unit, math.acos(d))
+end
+
+-- putar menuju target dengan batas kecepatan sudut (anti muter mendadak)
+local function rotateToward(cur, target, alpha, maxAng)
+    local rel = cur:Inverse() * target
+    local axis, ang = rel:ToAxisAngle()
+    if ang < 1e-4 then return target end
+    local step = math.min(ang * alpha, maxAng)
+    return cur * CFrame.fromAxisAngle(axis, step)
+end
+
+local function flatRot(v, fallback)
+    local f = Vector3.new(v.X, 0, v.Z)
+    if f.Magnitude < 0.01 then return fallback end
+    return CFrame.lookAt(Vector3.zero, f.Unit)
+end
+
+local function getTargetTorso(player)
+    if not player or not player.Parent or not Players:FindFirstChild(player.Name) or not player.Character then return nil end
+    local char = player.Character
+    return char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")
+end
+
+local function FindNearestPrey()
+    local nearest, shortest = nil, RAMPAGE_RADIUS
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and not rampageBlacklist[p.Name] then
+            local char = p.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 and not hum.Sit then
+                    local torso = getTargetTorso(p)
+                    if torso then
+                        local dist = (LeviathanCurrentPos - torso.Position).Magnitude
+                        if dist < shortest then
+                            shortest = dist
+                            nearest = p
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+-- ============================================================
+-- INIT RANTAI (bentuk persis sesuai data, semua nyambung)
+-- ============================================================
+local function initChain(hf)
+    local leader = hf:PointToWorldSpace(rearData)
+    local rot = hf.Rotation
+    for n = 1, TOTAL_SEG do
+        local s = Seg[n]
+        local d = rot:VectorToWorldSpace(s.out)
+        local p = leader + d * (s.len * Cfg[n].spacing)
+        baseDir[n] = d
+        smDir[n] = d
+        baseP[n] = p
+        bodyCF[s.idx] = CFrame.new(p) * rot * s.rot
+        leader = p
+    end
+    chainReady = true
+end
+
+-- ============================================================
+-- INPUT
+-- ============================================================
+track(UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+        jumpPressed = true
+    end
+end))
+track(UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+        jumpPressed = false
+    end
+end))
+
+-- ============================================================
+-- GUI
+-- ============================================================
+local sg = Instance.new("ScreenGui")
+sg.Name = "NightmareOtachi"
+sg.ResetOnSpawn = false
+if not pcall(function() sg.Parent = CoreGui end) then
+    sg.Parent = LP:WaitForChild("PlayerGui")
+end
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 190, 0, 238)
+main.Position = UDim2.new(0.05, 0, 0.35, 0)
+main.BackgroundColor3 = Color3.fromRGB(20, 4, 6)
+main.BorderSizePixel = 0
+main.ClipsDescendants = true
+main.Parent = sg
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(64, 6, 10)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = main
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -10, 1, 0)
+titleLabel.Position = UDim2.new(0, 5, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Nightmare The King of Otachi"
+titleLabel.TextColor3 = Color3.new(1, 1, 1)
+titleLabel.Font = Enum.Font.PermanentMarker
+titleLabel.TextSize = 12
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local uiGradient = Instance.new("UIGradient")
+uiGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 10, 20)),
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 70, 70)),
+    ColorSequenceKeypoint.new(0.66, Color3.fromRGB(200, 20, 30)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 10, 20)),
+})
+uiGradient.Parent = titleLabel
+
+local gradT = 0
+track(RS.RenderStepped:Connect(function(dt)
+    gradT = (gradT + dt * 0.4) % 1
+    uiGradient.Offset = Vector2.new(gradT * 2 - 1, 0)
+end))
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -10, 0, 15)
+statusLabel.Position = UDim2.new(0, 5, 1, -35)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Otachi: OFFLINE"
+statusLabel.TextColor3 = Color3.fromRGB(235, 190, 190)
+statusLabel.Font = Enum.Font.Code
+statusLabel.TextSize = 10
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = main
+
+local creditLabel = Instance.new("TextLabel")
+creditLabel.Size = UDim2.new(1, 0, 0, 15)
+creditLabel.Position = UDim2.new(0, 0, 1, -15)
+creditLabel.BackgroundTransparency = 1
+creditLabel.RichText = true
+creditLabel.Text = 'Engine base : Veyton.LSP <font color="rgb(255,60,70)">x BY SANDBOX_txt</font>'
+creditLabel.TextColor3 = Color3.fromRGB(190, 120, 120)
+creditLabel.Font = Enum.Font.Code
+creditLabel.TextSize = 10
+creditLabel.Parent = main
+
+local dragging, dragStart, startPos
+track(titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging, dragStart, startPos = true, input.Position, main.Position
+    end
+end))
+track(UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end))
+track(UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end))
+
+local container = Instance.new("Frame")
+container.Size = UDim2.new(1, -10, 0, 168)
+container.Position = UDim2.new(0, 5, 0, 35)
+container.BackgroundTransparency = 1
+container.Parent = main
+
+local function styleBtn(b)
+    b.BackgroundColor3 = Color3.fromRGB(46, 8, 12)
+    b.BorderSizePixel = 1
+    b.BorderColor3 = COLORS.Border
+    b.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 11
+    b.MouseEnter:Connect(function()
+        b.BorderColor3 = COLORS.Accent
+        b.TextColor3 = Color3.new(1, 1, 1)
+    end)
+    b.MouseLeave:Connect(function()
+        b.BorderColor3 = COLORS.Border
+    end)
+end
+
+local function createBtn(txt, pos, size)
+    local b = Instance.new("TextButton")
+    b.Text, b.Position, b.Size = txt, pos, size
+    b.Parent = container
+    styleBtn(b)
+    return b
+end
+
+local SummonBtn  = createBtn("ACTIVATE",        UDim2.new(0, 0, 0, 0),   UDim2.new(1, 0, 0, 24))
+local ControlBtn = createBtn("CONTROL: OFF",    UDim2.new(0, 0, 0, 28),  UDim2.new(1, 0, 0, 24))
+local RampageBtn = createBtn("TARGET ALL: OFF", UDim2.new(0, 0, 0, 84),  UDim2.new(1, 0, 0, 24))
+local HeadBtn    = createBtn("HEAD LOCK: ON",   UDim2.new(0, 0, 0, 112), UDim2.new(0.5, -2, 0, 24))
+local WaveBtn    = createBtn("TAIL: ON",        UDim2.new(0.5, 2, 0, 112), UDim2.new(0.5, -2, 0, 24))
+local SmoothBtn  = createBtn("SMOOTH: BALANCED", UDim2.new(0, 0, 0, 140), UDim2.new(1, 0, 0, 24))
+
+local TargetBox = Instance.new("TextBox")
+TargetBox.Size = UDim2.new(1, 0, 0, 24)
+TargetBox.Position = UDim2.new(0, 0, 0, 56)
+TargetBox.BackgroundColor3 = Color3.fromRGB(46, 8, 12)
+TargetBox.BorderSizePixel = 1
+TargetBox.BorderColor3 = COLORS.Border
+TargetBox.TextColor3 = Color3.fromRGB(250, 215, 215)
+TargetBox.PlaceholderText = "Target & Enter"
+TargetBox.PlaceholderColor3 = Color3.fromRGB(165, 95, 95)
+TargetBox.Text = ""
+TargetBox.Font = Enum.Font.Code
+TargetBox.TextSize = 10
+TargetBox.ClearTextOnFocus = false
+TargetBox.Parent = container
+
+-- ============================================================
+-- CONTROL (FLY)
+-- ============================================================
+local targetHighlight = Instance.new("Highlight")
+targetHighlight.Name = "OtachiTargetHighlight"
+targetHighlight.FillColor = Color3.fromRGB(255, 30, 40)
+targetHighlight.FillTransparency = 0.5
+targetHighlight.OutlineColor = Color3.new(1, 1, 1)
+targetHighlight.OutlineTransparency = 0
+
+local function manageTool(state)
+    local toolName = "Otachi Strike"
+    local old = LP.Backpack:FindFirstChild(toolName) or (LP.Character and LP.Character:FindFirstChild(toolName))
+    if old then old:Destroy() end
+
+    if state then
+        local tool = Instance.new("Tool")
+        tool.Name = toolName
+        tool.RequiresHandle = false
+        tool.Parent = LP.Backpack
+
+        local renderConn
+        tool.Equipped:Connect(function()
+            renderConn = RS.RenderStepped:Connect(function()
+                if not isControlling then return end
+                local mouse = LP:GetMouse()
+                local hovered
+                if mouse.Target and mouse.Target.Parent then
+                    local p = Players:GetPlayerFromCharacter(mouse.Target.Parent)
+                    if p and p ~= LP then hovered = p end
+                end
+                if hovered and hovered.Character then
+                    lockedTargetPlayer = hovered
+                    targetHighlight.Adornee = hovered.Character
+                    targetHighlight.Parent = hovered.Character
+                elseif not mouse.Target or not mouse.Target.Parent or not Players:GetPlayerFromCharacter(mouse.Target.Parent) then
+                    lockedTargetPlayer = nil
+                    targetHighlight.Adornee = nil
+                    targetHighlight.Parent = nil
+                end
+            end)
+        end)
+
+        -- FLING: ekor menyabet
+        tool.Activated:Connect(function()
+            if not isFlinging then
+                isFlinging = true
+                flingTimer = FLING_DURATION
+            end
+        end)
+
+        tool.Unequipped:Connect(function()
+            if renderConn then renderConn:Disconnect() renderConn = nil end
+            targetHighlight.Adornee = nil
+            targetHighlight.Parent = nil
+            lockedTargetPlayer = nil
+        end)
+    else
+        targetHighlight.Adornee = nil
+        targetHighlight.Parent = nil
+        lockedTargetPlayer = nil
+    end
+end
+
+local function stopLeviathanFly()
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if LeviathanCore then LeviathanCore:Destroy() LeviathanCore = nil end
+    bodyVel, bodyGyro = nil, nil
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = 16
+        hum.JumpPower = 50
+        pcall(function() hum.JumpHeight = 7.2 end)
+        workspace.CurrentCamera.CameraSubject = hum
+    end
+    manageTool(false)
+end
+
+local function startLeviathanFly()
+    if LeviathanCore then LeviathanCore:Destroy() end
+    LeviathanCore = Instance.new("Part")
+    LeviathanCore.Size = Vector3.new(2, 2, 2)
+    LeviathanCore.Transparency = 1
+    LeviathanCore.CanCollide = false
+    LeviathanCore.Massless = true
+    LeviathanCore.Position = LeviathanCurrentPos
+    LeviathanCore.Parent = workspace
+
+    bodyVel = Instance.new("BodyVelocity")
+    bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVel.Velocity = Vector3.zero
+    bodyVel.Parent = LeviathanCore
+
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 10000
+    bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+    bodyGyro.Parent = LeviathanCore
+
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        pcall(function() hum.JumpHeight = 0 end)
+    end
+
+    workspace.CurrentCamera.CameraSubject = LeviathanCore
+    manageTool(true)
+
+    flyConnection = RS.RenderStepped:Connect(function()
+        if not isControlling or not LeviathanCore then return end
+        local c = LP.Character
+        local h = c and c:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = 0 h.JumpPower = 0 end
+
+        local camCF = workspace.CurrentCamera.CFrame
+        local moveVector = Vector3.zero
+        pcall(function()
+            moveVector = require(LP.PlayerScripts.PlayerModule):GetControls():GetMoveVector()
+        end)
+        local flyDir = (camCF.RightVector * moveVector.X) + (camCF.LookVector * -moveVector.Z)
+        if jumpPressed or UIS:IsKeyDown(Enum.KeyCode.Space) then
+            flyDir += Vector3.new(0, 1, 0)
+        end
+        if flyDir.Magnitude > 0.01 then
+            bodyVel.Velocity = flyDir.Unit * CONTROL_SPEED
+            bodyGyro.CFrame = CFrame.lookAt(LeviathanCore.Position, LeviathanCore.Position + flyDir)
+        else
+            bodyVel.Velocity = Vector3.zero
+            bodyGyro.CFrame = camCF
+        end
+    end)
+end
+
+-- ============================================================
+-- TOMBOL
+-- ============================================================
+local function resetButtons()
+    ControlBtn.Text = "CONTROL: OFF"
+    ControlBtn.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+    RampageBtn.Text = "TARGET ALL: OFF"
+    RampageBtn.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+end
+
+ControlBtn.MouseButton1Click:Connect(function()
+    if not petMode then return end
+    isControlling = not isControlling
+    if isControlling then
+        rampageMode = false
+        RampageBtn.Text = "TARGET ALL: OFF"
+        RampageBtn.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+        ControlBtn.Text = "CONTROL: ON"
+        ControlBtn.TextColor3 = COLORS.Accent
+        startLeviathanFly()
+    else
+        ControlBtn.Text = "CONTROL: OFF"
+        ControlBtn.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+        stopLeviathanFly()
+    end
+end)
+
+HeadBtn.MouseButton1Click:Connect(function()
+    HEAD_LOCK = not HEAD_LOCK
+    if HEAD_LOCK then lockedRot = freeRot end   -- kunci di arah sekarang
+    HeadBtn.Text = HEAD_LOCK and "HEAD LOCK: ON" or "HEAD LOCK: OFF"
+    HeadBtn.TextColor3 = HEAD_LOCK and COLORS.Accent or Color3.new(0.85, 0.85, 0.85)
+end)
+
+WaveBtn.MouseButton1Click:Connect(function()
+    waveOn = not waveOn
+    WaveBtn.Text = waveOn and "TAIL: ON" or "TAIL: OFF"
+    WaveBtn.TextColor3 = waveOn and COLORS.Accent or Color3.new(0.85, 0.85, 0.85)
+end)
+
+SmoothBtn.MouseButton1Click:Connect(function()
+    presetIdx = presetIdx % #PRESETS + 1
+    SmoothBtn.Text = "SMOOTH: " .. PRESETS[presetIdx].name
+end)
+
+HeadBtn.TextColor3 = COLORS.Accent
+WaveBtn.TextColor3 = COLORS.Accent
+
+TargetBox.FocusLost:Connect(function(enter)
+    if not enter then return end
+    if rampageMode or isControlling then return end
+    local key = TargetBox.Text:lower()
+    if key == "" then
+        TargetPlayer = nil
+        TargetBox.BorderColor3 = COLORS.Border
+        return
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower():find(key) or p.DisplayName:lower():find(key) then
+            TargetPlayer = p
+            TargetBox.Text = p.DisplayName
+            TargetBox.BorderColor3 = COLORS.Good
+            return
+        end
+    end
+    TargetPlayer = nil
+    TargetBox.Text = "[NOT FOUND]"
+    TargetBox.BorderColor3 = COLORS.WarningRed
+    task.wait(1)
+    TargetBox.Text = ""
+    TargetBox.BorderColor3 = COLORS.Border
+end)
+
+SummonBtn.MouseButton1Click:Connect(function()
+    petMode = not petMode
+    if petMode then
+        SummonBtn.TextColor3 = COLORS.Accent
+        SummonBtn.Text = "DEACTIVATE"
+        ScanForProps()
+        local char = LP.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            -- arah kepala dikunci sesuai arah player saat ACTIVATE
+            lockedRot = flatRot(root.CFrame.LookVector, CFrame.new())
+            freeRot = lockedRot
+            LeviathanCurrentPos = root.Position + lockedRot:VectorToWorldSpace(BASE_OFFSET)
+        end
+        followVel = Vector3.zero
+        table.clear(bodyCF)
+        table.clear(curCF)
+        chainReady = false
+        lastHeadPos = nil
+    else
+        SummonBtn.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+        SummonBtn.Text = "ACTIVATE"
+        rampageMode, isControlling = false, false
+        stopLeviathanFly()
+        resetButtons()
+        TargetPlayer = nil
+        TargetBox.Text = ""
+        TargetBox.BorderColor3 = COLORS.Border
+        table.clear(rampageBlacklist)
+        table.clear(bodyCF)
+        table.clear(curCF)
+        chainReady = false
+    end
+end)
+
+RampageBtn.MouseButton1Click:Connect(function()
+    if not petMode or isControlling then return end
+    rampageMode = not rampageMode
+    if rampageMode then
+        table.clear(rampageBlacklist)
+        RampageBtn.Text = "RAMPAGE: ACTIVE"
+        RampageBtn.TextColor3 = COLORS.Accent
+        TargetBox.Text = "[HUNTING]"
+        TargetBox.BorderColor3 = COLORS.Accent
+    else
+        RampageBtn.Text = "TARGET ALL: OFF"
+        RampageBtn.TextColor3 = Color3.new(0.85, 0.85, 0.85)
+        TargetPlayer = nil
+        TargetBox.Text = ""
+        TargetBox.BorderColor3 = COLORS.Border
+    end
+end)
+
+track(LP.CharacterAdded:Connect(function()
+    if isControlling then
+        isControlling = false
+        stopLeviathanFly()
+        resetButtons()
+    end
+end))
+
+-- ============================================================
+-- MAIN ENGINE
+-- ============================================================
+local lastStatus = ""
+local function setStatus(txt, col)
+    if txt ~= lastStatus then
+        lastStatus = txt
+        statusLabel.Text = txt
+        statusLabel.TextColor3 = col
+    end
+end
+
+track(RS.Heartbeat:Connect(function(dt)
+    if not alive then return end
+    dt = math.min(dt, 1 / 15)
+    if not petMode then return end
+
+    local t = tick()
+    local pr = PRESETS[presetIdx]
+
+    -- cek prop hilang / baru
+    local needRescan = t - lastPropScanTime > 1.5
+    if not needRescan and t - lastValidCheck > 0.25 then
+        lastValidCheck = t
+        for i = 1, N do
+            local p = slotProp[i]
+            if p and not p.Parent then needRescan = true break end
+        end
+    end
+    if needRescan then
+        lastPropScanTime = t
+        ScanForProps()
+    end
+
+    local have = 0
+    for i = 1, N do
+        local p = slotProp[i]
+        if p and p.Parent then have += 1 end
+    end
+    if have == 0 then
+        setStatus("Otachi: NO PROPS", COLORS.WarningRed)
+        return
+    end
+
+    if isFlinging then
+        flingTimer = flingTimer - dt
+        if flingTimer <= 0 then isFlinging = false end
+    end
+
+    if isFlinging then
+        setStatus("Otachi: [TAIL STRIKE!]", COLORS.WarningRed)
+    elseif isControlling then
+        setStatus("Otachi: MANUAL", COLORS.Accent)
+    elseif rampageMode then
+        setStatus("Otachi: RAMPAGE", COLORS.Accent)
+    else
+        setStatus("Otachi: BASE P (" .. have .. "/" .. N .. ")", COLORS.Good)
+    end
+
+    -- ---------------- RAMPAGE LOGIC ----------------
+    if rampageMode and not isControlling then
+        if TargetPlayer then
+            local ch = TargetPlayer.Character
+            local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+            local torso = getTargetTorso(TargetPlayer)
+            if not ch or not hum or hum.Health <= 0 or hum.Sit or rampageBlacklist[TargetPlayer.Name] or not Players:FindFirstChild(TargetPlayer.Name) then
+                TargetPlayer = nil
+            elseif torso then
+                local vel = torso.AssemblyLinearVelocity.Magnitude
+                local moved = (torso.Position - targetAttackTrack.initialPos).Magnitude
+                if vel > 120 or moved > 85 then
+                    rampageBlacklist[TargetPlayer.Name] = true
+                    TargetPlayer = nil
+                elseif t - targetAttackTrack.startTime > MAX_STUCK_TIME and moved < 8 then
+                    rampageBlacklist[TargetPlayer.Name] = true
+                    TargetPlayer = nil
+                end
+            end
+        end
+
+        if t - lastPreyScanTime > 0.35 then
+            lastPreyScanTime = t
+            if not TargetPlayer then
+                local prey = FindNearestPrey()
+                if prey then
+                    TargetPlayer = prey
+                    targetAttackTrack.player = prey
+                    targetAttackTrack.startTime = t
+                    local tt = getTargetTorso(prey)
+                    if tt then targetAttackTrack.initialPos = tt.Position end
+                    TargetBox.Text = "HUNT: " .. prey.DisplayName
+                    TargetBox.BorderColor3 = COLORS.Accent
+                else
+                    TargetBox.Text = "[SCAN FAIL]"
+                    TargetBox.BorderColor3 = COLORS.Border
+                end
+            end
+        end
+    end
+
+    -- ---------------- ROTASI KEPALA (HEAD LOCK = TIDAK MUTER) ----------------
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local headRot
+    if HEAD_LOCK then
+        headRot = lockedRot
+        freeRot = lockedRot
+    else
+        local desired = freeRot
+        local tt = rampageMode and TargetPlayer and getTargetTorso(TargetPlayer)
+        if isControlling and LeviathanCore then
+            desired = flatRot(LeviathanCore.CFrame.LookVector, freeRot)
+        elseif tt then
+            desired = flatRot(tt.Position - LeviathanCurrentPos, freeRot)
+        elseif root then
+            desired = flatRot(root.CFrame.LookVector, freeRot)
+        end
+        freeRot = freeRot:Lerp(desired, 1 - math.exp(-pr.rot * dt))
+        headRot = freeRot
+    end
+
+    -- ---------------- POSISI ORIGIN (BASE P = PLAYER) ----------------
+    if isControlling and LeviathanCore and bodyVel then
+        followVel = Vector3.zero
+        LeviathanCurrentPos = LeviathanCore.Position + Vector3.new(0, math.sin(t * 1.8) * HOVER_SWAY, 0)
+    else
+        local isPetState = false
+        local currentTarget = TargetPlayer
+        if not rampageMode and (not currentTarget or not currentTarget.Character or not getTargetTorso(currentTarget)) then
+            currentTarget = LP
+            isPetState = true
+        end
+        local targetTorso = getTargetTorso(currentTarget)
+
+        if targetTorso then
+            local ideal
+            if isPetState then
+                local base = (root and root.Position) or targetTorso.Position
+                ideal = base + headRot:VectorToWorldSpace(BASE_OFFSET) + Vector3.new(0, math.sin(t * 1.8) * HOVER_SWAY, 0)
+            else
+                local ox = math.cos(t * ORBIT_SPEED) * ORBIT_RADIUS
+                local oz = math.sin(t * ORBIT_SPEED) * ORBIT_RADIUS
+                local oy = math.sin(t * 2) * 5
+                ideal = targetTorso.Position + Vector3.new(ox, oy + ORBIT_HEIGHT, oz)
+            end
+
+            if (ideal - LeviathanCurrentPos).Magnitude > 400 then
+                LeviathanCurrentPos = ideal
+                followVel = Vector3.zero
+            else
+                LeviathanCurrentPos, followVel = smoothDamp(
+                    LeviathanCurrentPos, ideal, followVel,
+                    (isPetState and PET_SMOOTH_TIME or RAMPAGE_SMOOTH_TIME) * pr.smooth,
+                    isPetState and PET_MAX_SPEED or RAMPAGE_MAX_SPEED, dt)
+            end
+        end
+    end
+
+    local headFrame = CFrame.new(LeviathanCurrentPos) * headRot
+
+    -- teleport -> rantai reset ke bentuk data
+    local teleported = lastHeadPos and (headFrame.Position - lastHeadPos).Magnitude > 150
+    local rawSpeed = 0
+    if lastHeadPos and not teleported then
+        rawSpeed = (headFrame.Position - lastHeadPos).Magnitude / math.max(dt, 1e-3)
+    end
+    lastHeadPos = headFrame.Position
+    speedSm = speedSm + (rawSpeed - speedSm) * (1 - math.exp(-5 * dt))
+    local moveF = math.clamp(speedSm / 30, 0, 1)
+
+    if not chainReady or teleported then
+        initChain(headFrame)
+    end
+
+    -- ================================================================
+    -- DYNAMIC BODY CHAIN (rigid link, semua nyambung)
+    -- ================================================================
+    local anchor = headFrame:PointToWorldSpace(rearData)
+    local upRef = headRot.UpVector
+
+    -- 1) rantai FISIK: tiap ruas diseret oleh ruas di depannya (jarak dikunci persis)
+    local restPull = math.clamp(REST_PULL * (1 - moveF * 0.85) * dt, 0, 1)
+    local leaderB = anchor
+    for n = 1, TOTAL_SEG do
+        local s = Seg[n]
+        local len = s.len * Cfg[n].spacing
+        local v = baseP[n] - leaderB
+        local rest = headRot:VectorToWorldSpace(s.out)
+        local d
+        if v.Magnitude > 1e-3 then d = v.Unit else d = rest end
+        d = (d + (rest - d) * restPull)
+        if d.Magnitude < 1e-3 then d = rest else d = d.Unit end
+        local np = leaderB + d * len
+        baseP[n] = np
+        baseDir[n] = d
+        leaderB = np
+    end
+
+    -- 2) gelombang / swirl ekor merambat kepala -> ekor (melingkar saat diam)
+    if isFlinging then
+        waveTime = waveTime + dt * WAVE_SPEED * 3
+    else
+        waveTime = waveTime + dt * WAVE_SPEED
+    end
+    waveStr = waveStr + ((waveOn and 1 or 0) - waveStr) * (1 - math.exp(-3 * dt))
+    local idleMul = 1 - MOVE_DAMP * moveF
+    local flingMul = isFlinging and 2.4 or 1.0
+
+    local renderLeader = anchor
+    for n = 1, TOTAL_SEG do
+        local s = Seg[n]
+        local cfg = Cfg[n]
+        local len = s.len * cfg.spacing
+        local bd = baseDir[n]
+
+        local right = bd:Cross(upRef)
+        if right.Magnitude < 0.2 then right = headRot.RightVector else right = right.Unit end
+        local up2 = right:Cross(bd)
+
+        local prog = n / TOTAL_SEG
+        local amp = SWIRL_AMP * (prog ^ SWIRL_EXP) * cfg.amp * waveStr * idleMul * pr.wave * flingMul
+        local ph = waveTime - n * WAVE_FREQ - cfg.lag
+        local th = amp * math.cos(ph)
+        local tv = amp * SWIRL_VERT * math.sin(ph)
+
+        local want = bd + right * th + up2 * tv
+        want = want.Unit
+
+        local tau = 1 / pr.dir + cfg.smooth * pr.smooth
+        local aDir = 1 - math.exp(-dt / tau)
+        local cd = smDir[n] or want
+        cd = cd + (want - cd) * aDir
+        if cd.Magnitude < 1e-3 then cd = want else cd = cd.Unit end
+        smDir[n] = cd
+
+        local np = renderLeader + cd * len
+
+        -- prop: posisi + rotasi stabil
+        local o = cfg.pos
+        local propPos = np + right * o.X + up2 * o.Y + cd * o.Z
+        local refOut = headRot:VectorToWorldSpace(s.out)
+        local tgtRot = arcRot(refOut, cd) * headRot * s.rot * cfg.rot
+
+        local cur = bodyCF[s.idx]
+        local curRot = cur and cur.Rotation or tgtRot
+        local aRot = 1 - math.exp(-dt / (1 / pr.rot + cfg.smooth * 0.3 * pr.smooth))
+        local rot = rotateToward(curRot, tgtRot, aRot, pr.rotMax * dt)
+
+        bodyCF[s.idx] = CFrame.new(propPos) * rot
+        renderLeader = np
+    end
+
+    -- ---------------- TARGET CF TIAP PROP ----------------
+    for i = 1, N do
+        local prop = slotProp[i]
+        if prop and prop.Parent then
+            if isBody[i] then
+                curCF[i] = bodyCF[i]
+            else
+                curCF[i] = headFrame * D[i].cf   -- kepala rigid, tidak muter
+            end
+        end
+    end
+
+    processSizes(t)
+    sendColors(t)
+    sendPositions(t, have)
+end))
+
+_G.__OtachiStop = function()
+    alive = false
+    pcall(stopLeviathanFly)
+    for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+    pcall(function() sg:Destroy() end)
+end
+
+print("Nightmare The King of Otachi LOADED | props: " .. N .. " | DYNAMIC BODY CHAIN V2")
